@@ -128,7 +128,7 @@ class BiddingBot:
         # 확인 메시지
         keyboard = [
             [
-                InlineKeyboardButton("✅ 시작", callback_data=f"auto_start_{site}_{~".join(keywords)}"),
+                InlineKeyboardButton("✅ 시작", callback_data=f"auto_start_{site}_{'|'.join(keywords)}"),
                 InlineKeyboardButton("❌ 취소", callback_data="auto_cancel")
             ]
         ]
@@ -318,7 +318,7 @@ class BiddingBot:
             # 자동화 입찰 시작
             parts = data.split("_", 3)
             site = parts[2]
-            keywords = parts[3].split("~") if len(parts) > 3 else []
+            keywords = parts[3].split("|") if len(parts) > 3 else []
             
             await query.edit_message_text("🤖 자동화 입찰을 시작합니다...")
             
@@ -350,38 +350,54 @@ class BiddingBot:
                 'stage': '초기화'
             }
             
+            # 시작 메시지
+            await query.message.chat.send_message(
+                f"🚀 **자동화 입찰 시작**\n\n"
+                f"🎯 사이트: {site.upper()}\n"
+                f"🔍 키워드: {', '.join(keywords)}\n"
+                f"⏰ 예상 시간: 10-15분\n\n"
+                f"진행 상황을 알려드리겠습니다...",
+                parse_mode='Markdown'
+            )
+            
             # 진행 상황 업데이트
             stages = [
-                ('키워드 검색', '검색 페이지 접속 중...'),
-                ('링크 추출', '상품 링크 수집 중...'),
-                ('정보 수집', '상품 정보 스크래핑 중...'),
-                ('가격 계산', '최적 가격 계산 중...'),
-                ('입찰 실행', '입찰 진행 중...')
+                ('로그인 확인', '🔐 로그인 상태 확인 중...', 5),
+                ('키워드 검색', '🔍 검색 페이지 접속 중...', 10),
+                ('링크 추출', '🔗 상품 링크 수집 중...', 20),
+                ('정보 수집', '📦 상품 정보 스크래핑 중...', 40),
+                ('가격 계산', '💰 최적 가격 계산 중...', 10),
+                ('입찰 실행', '🎯 입찰 진행 중...', 15)
             ]
             
-            for i, (stage, description) in enumerate(stages):
+            total_weight = sum(s[2] for s in stages)
+            current_progress = 0
+            
+            for i, (stage, description, weight) in enumerate(stages):
                 if not self.is_running:
                     break
                 
                 self.current_task['stage'] = stage
+                current_progress += weight
+                
+                # 진행률 계산
+                percentage = int((current_progress / total_weight) * 100)
+                
+                # 프로그레스 바 생성
+                filled = int(percentage / 10)
+                progress_bar = "█" * filled + "░" * (10 - filled)
                 
                 # 메시지 업데이트
-                progress = "▓" * (i + 1) + "░" * (len(stages) - i - 1)
                 await query.message.chat.send_message(
-                    f"🤖 **자동화 진행 중**\n\n"
-                    f"[{progress}] {(i+1)*20}%\n"
-                    f"단계: {stage}\n"
-                    f"{description}",
+                    f"⚙️ **진행 상황**\n\n"
+                    f"[{progress_bar}] {percentage}%\n\n"
+                    f"🔄 현재 단계: {stage}\n"
+                    f"📝 {description}",
                     parse_mode='Markdown'
                 )
                 
-                # 실제로는 여기서 해당 단계 실행
-                if i == 0:
-                    await asyncio.sleep(3)  # 검색 시간
-                elif i == 1:
-                    await asyncio.sleep(5)  # 링크 추출 시간
-                else:
-                    await asyncio.sleep(2)
+                # 실제 작업 시뮬레이션 (나중에 실제 작업으로 교체)
+                await asyncio.sleep(weight / 5)  # 가중치에 따른 대기 시간
             
             # 실제 자동 입찰 실행
             if self.is_running:
@@ -394,19 +410,53 @@ class BiddingBot:
                 
                 # 결과 메시지
                 if result['status'] == 'success':
+                    # 성공 메시지
+                    success_msg = (
+                        f"✅ **자동화 입찰 완료!**\n\n"
+                        f"📊 **결과 요약**\n"
+                        f"├ 🔍 검색 키워드: {', '.join(keywords)}\n"
+                        f"├ 🔗 수집된 링크: {result.get('total_links', 0)}개\n"
+                        f"├ 📦 처리된 상품: {result.get('total_items', 0)}개\n"
+                        f"├ ✅ 성공한 입찰: {result.get('successful_bids', 0)}개\n"
+                        f"└ ⏱️ 소요 시간: {result.get('execution_time', 0):.1f}초\n\n"
+                        f"💾 결과는 `output` 폴더에 저장되었습니다."
+                    )
+                    
                     await query.message.chat.send_message(
-                        f"✅ **자동화 입찰 완료**\n\n"
-                        f"🔍 키워드: {', '.join(keywords)}\n"
-                        f"🔗 수집된 링크: {result['total_links']}개\n"
-                        f"📦 처리된 상품: {result['total_items']}개\n"
-                        f"✅ 성공한 입찰: {result['successful_bids']}개\n"
-                        f"⏱️ 실행 시간: {result['execution_time']:.2f}초",
+                        success_msg,
                         parse_mode='Markdown'
                     )
+                    
+                    # 입찰 성공률 계산
+                    if result.get('total_items', 0) > 0:
+                        success_rate = (result.get('successful_bids', 0) / result.get('total_items', 0)) * 100
+                        
+                        # 성공률에 따른 이모지
+                        if success_rate >= 80:
+                            emoji = "🎯"
+                        elif success_rate >= 50:
+                            emoji = "👍"
+                        else:
+                            emoji = "⚠️"
+                        
+                        await query.message.chat.send_message(
+                            f"{emoji} 입찰 성공률: {success_rate:.1f}%",
+                            parse_mode='Markdown'
+                        )
                 else:
-                    await query.message.chat.send_message(
+                    # 실패 메시지
+                    error_msg = (
                         f"❌ **자동화 입찰 실패**\n\n"
-                        f"오류: {result.get('error', '알 수 없는 오류')}",
+                        f"⚠️ 오류 내용:\n"
+                        f"```\n{result.get('error', '알 수 없는 오류')}\n```\n\n"
+                        f"💡 **해결 방법**\n"
+                        f"1. 인터넷 연결 확인\n"
+                        f"2. 사이트 접속 가능 여부 확인\n"
+                        f"3. 로그 파일 확인 (`logs` 폴더)"
+                    )
+                    
+                    await query.message.chat.send_message(
+                        error_msg,
                         parse_mode='Markdown'
                     )
             

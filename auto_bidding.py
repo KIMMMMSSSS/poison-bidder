@@ -27,6 +27,14 @@ try:
 except ImportError:
     SELENIUM_AVAILABLE = False
 
+# 로그인 관리자 import
+try:
+    from login_manager import LoginManager
+    LOGIN_MANAGER_AVAILABLE = True
+except ImportError:
+    LOGIN_MANAGER_AVAILABLE = False
+    print("로그인 관리자를 사용할 수 없습니다.")
+
 # 로깅 설정
 log_dir = Path("logs")
 log_dir.mkdir(exist_ok=True)
@@ -51,6 +59,7 @@ class AutoBidding:
         self.config = self._load_config(config_path)
         self.driver = None
         self.results = {}
+        self.login_manager = None
         
     def _load_config(self, config_path: str) -> Dict[str, Any]:
         """설정 파일 로드"""
@@ -181,7 +190,20 @@ class AutoBidding:
         links = []
         
         try:
-            # 드라이버 초기화
+            # 로그인 관리자 사용
+            if LOGIN_MANAGER_AVAILABLE and not self.driver:
+                logger.info("로그인 확인 중...")
+                self.login_manager = LoginManager(site)
+                
+                # 로그인 상태 확인 및 로그인
+                if self.login_manager.ensure_login():
+                    self.driver = self.login_manager.driver
+                    logger.info("로그인 완료, 검색 시작")
+                else:
+                    logger.error("로그인 실패")
+                    return []
+            
+            # 드라이버가 없으면 일반 모드로 초기화
             if not self.driver:
                 options = uc.ChromeOptions()
                 options.add_argument("--no-sandbox")

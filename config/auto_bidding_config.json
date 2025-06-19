@@ -26,5 +26,10 @@
     "headless": false,
     "window_size": "1920,1080",
     "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+  },
+  "login": {
+    "use_saved_cookies": true,
+    "cookie_expiry_days": 7,
+    "auto_login": false
   }
 }
