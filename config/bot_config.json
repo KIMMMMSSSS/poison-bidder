@@ -1,0 +1,21 @@
+{
+  "bot": {
+    "token": "YOUR_BOT_TOKEN_HERE",
+    "admin_ids": [123456789],
+    "command_timeout": 300,
+    "update_interval": 5
+  },
+  "bidding": {
+    "default_site": "musinsa",
+    "default_strategy": "basic",
+    "default_mode": "manual",
+    "max_concurrent_tasks": 1
+  },
+  "messages": {
+    "welcome": "🤖 K-Fashion 자동 입찰 봇\n\n사용 가능한 명령어:\n/bid - 입찰 시작\n/status - 현재 상태\n/stop - 작업 중지\n/help - 도움말",
+    "unauthorized": "⛔ 권한이 없습니다.",
+    "task_running": "⏳ 작업이 이미 진행 중입니다.",
+    "no_task": "💤 진행 중인 작업이 없습니다.",
+    "error": "❌ 오류가 발생했습니다: {error}"
+  }
+}
