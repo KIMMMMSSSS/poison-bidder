@@ -165,17 +165,53 @@ class AutoBiddingAdapter:
             items: auto_bidding.py에서 조정된 상품 목록
         """
         try:
+            # 파라미터 타입 검증
+            logger.info(f"run_with_poison 호출 - items 타입: {type(items)}")
+            
+            if not isinstance(items, list):
+                error_msg = f"TypeError: items는 list 타입이어야 합니다. 받은 타입: {type(items).__name__}, 값: {items}"
+                logger.error(error_msg)
+                raise TypeError(error_msg)
+            
+            # 빈 데이터 체크
+            if not items:
+                logger.warning("입력된 items가 비어있습니다. 입찰할 항목이 없습니다.")
+                return {
+                    'status': 'success',
+                    'total': 0,
+                    'successful': 0,
+                    'failed': 0,
+                    'results': [],
+                    'message': '입찰할 항목이 없습니다'
+                }
+            
             logger.info("포이즌 입찰 시작 (PoizonBidderWrapperV2 사용)")
             logger.info(f"입력 아이템 수: {len(items)}")
             
-            if items:
-                logger.debug(f"첫 번째 아이템 예시: {items[0]}")
-                # 필수 필드 검증
-                required_fields = ['code', 'brand', 'size', 'price']
-                sample_item = items[0]
-                missing_fields = [field for field in required_fields if field not in sample_item]
-                if missing_fields:
-                    logger.warning(f"누락된 필수 필드: {missing_fields}")
+            # 상세 파라미터 정보 로깅
+            logger.info(f"첫 번째 아이템 타입: {type(items[0]) if items else 'N/A'}")
+            if items and isinstance(items[0], dict):
+                logger.info(f"첫 번째 아이템 키: {list(items[0].keys())}")
+            
+            # 모든 아이템의 구조 검증
+            for i, item in enumerate(items):
+                if not isinstance(item, dict):
+                    error_msg = f"TypeError: items[{i}]는 dict 타입이어야 합니다. 받은 타입: {type(item).__name__}, 값: {item}"
+                    logger.error(error_msg)
+                    logger.error(f"전체 items 타입 정보: {[type(x).__name__ for x in items[:5]]}...")  # 처음 5개만 표시
+                    raise TypeError(error_msg)
+            
+            logger.debug(f"첫 번째 아이템 예시: {items[0]}")
+            
+            # 필수 필드 검증 (첫 번째 아이템에 대해서만 엄격하게 검증)
+            required_fields = ['code', 'brand', 'size', 'price']
+            sample_item = items[0]
+            missing_fields = [field for field in required_fields if field not in sample_item]
+            if missing_fields:
+                error_msg = f"ValueError: 필수 필드가 누락되었습니다: {missing_fields}. 아이템 키: {list(sample_item.keys())}"
+                logger.error(error_msg)
+                logger.error(f"예시 아이템: {sample_item}")
+                raise ValueError(error_msg)
             
             # PoizonBidderWrapper 인스턴스 생성
             self.poison_bidder = PoizonBidderWrapperV2(
@@ -201,17 +237,34 @@ class AutoBiddingAdapter:
                 'fail_log_path': result.get('fail_log_path')
             }
             
+        except TypeError as e:
+            # 타입 오류는 즉시 재발생
+            logger.error(f"TypeError 발생: {e}")
+            logger.error(f"items 타입: {type(items)}, items 첫 5개: {items[:5] if isinstance(items, list) else items}")
+            raise
+            
+        except ValueError as e:
+            # 값 오류도 즉시 재발생
+            logger.error(f"ValueError 발생: {e}")
+            raise
+            
         except Exception as e:
-            logger.error(f"포이즌 입찰 실행 중 오류: {e}")
+            logger.error(f"포이즌 입찰 실행 중 예상치 못한 오류: {e}")
+            logger.error(f"오류 타입: {type(e).__name__}")
+            logger.error(f"items 타입: {type(items) if 'items' in locals() else 'N/A'}")
+            logger.error(f"items 개수: {len(items) if isinstance(items, list) else 'N/A'}")
+            
             import traceback
+            logger.error("Traceback:")
             logger.error(traceback.format_exc())
             
             return {
                 'status': 'error',
                 'message': str(e),
-                'total': 0,
+                'error_type': type(e).__name__,
+                'total': len(items) if isinstance(items, list) else 0,
                 'successful': 0,
-                'failed': len(items),
+                'failed': len(items) if isinstance(items, list) else 0,
                 'results': []
             }
     
