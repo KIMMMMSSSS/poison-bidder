@@ -85,43 +85,62 @@ def login_to_poison():
         
         # South Korea 옵션 찾아서 클릭
         try:
-            # 옵션 리스트에서 South Korea 찾기
-            # 먼저 드롭다운 컨테이너 찾기
-            dropdown_container = wait.until(
-                EC.presence_of_element_located((By.CLASS_NAME, "ant-select-dropdown"))
-            )
+            # 드롭다운 리스트가 나타날 때까지 대기
+            time.sleep(0.5)
             
-            # JavaScript로 스크롤하면서 South Korea 찾기
+            # JavaScript로 드롭다운 내부 스크롤하면서 South Korea 찾기
             driver.execute_script("""
-                const dropdown = arguments[0];
-                const options = dropdown.querySelectorAll('.ant-select-item-option');
+                // 드롭다운 리스트 컨테이너 찾기
+                const dropdownList = document.querySelector('.ant-select-dropdown .rc-virtual-list-holder');
+                if (!dropdownList) {
+                    const dropdownList = document.querySelector('.ant-select-dropdown');
+                }
+                
+                // 모든 옵션 찾기
+                const options = document.querySelectorAll('.ant-select-item-option');
+                
+                // South Korea 옵션 찾아서 스크롤 후 클릭
                 for (let option of options) {
                     if (option.textContent.includes('South Korea')) {
-                        option.scrollIntoView();
-                        option.click();
+                        // 드롭다운 내부에서 해당 옵션이 보이도록 스크롤
+                        option.scrollIntoView({ block: 'center', behavior: 'smooth' });
+                        setTimeout(() => option.click(), 500);
                         break;
                     }
                 }
-            """, dropdown_container)
+            """)
             
-            time.sleep(0.5)
-        except:
-            # 대체 방법: 키보드로 찾기
+            time.sleep(1)
+        except Exception as e:
+            logger.error(f"JavaScript 실행 실패: {e}")
+            # 대체 방법: Actions를 사용한 스크롤
             try:
-                # 검색 입력 필드에 "South" 입력
-                search_input = driver.find_element(By.CSS_SELECTOR, ".ant-select-dropdown input")
-                search_input.send_keys("South")
-                time.sleep(0.5)
+                from selenium.webdriver.common.action_chains import ActionChains
                 
-                # South Korea 선택
-                korea_option = driver.find_element(
-                    By.XPATH, "//div[contains(text(), 'South Korea')]"
-                )
-                korea_option.click()
-            except:
-                # 직접 스크롤하여 찾기
+                # 드롭다운 내부 클릭해서 포커스
+                dropdown = driver.find_element(By.CLASS_NAME, "ant-select-dropdown")
+                actions = ActionChains(driver)
+                
+                # 여러 번 페이지 다운 키 입력하여 스크롤
+                for _ in range(10):  # South Korea가 있을 때까지 스크롤
+                    actions.send_keys(Keys.PAGE_DOWN).perform()
+                    time.sleep(0.2)
+                    
+                    # South Korea 옵션이 보이는지 확인
+                    try:
+                        korea_option = driver.find_element(
+                            By.XPATH, "//div[contains(@class, 'ant-select-item-option') and contains(text(), 'South Korea')]"
+                        )
+                        if korea_option.is_displayed():
+                            korea_option.click()
+                            break
+                    except:
+                        continue
+                        
+            except Exception as e:
+                logger.error(f"스크롤 방법 실패: {e}")
                 logger.warning("수동으로 South Korea를 선택해주세요.")
-                time.sleep(3)
+                time.sleep(5)
         
         time.sleep(1)
         
