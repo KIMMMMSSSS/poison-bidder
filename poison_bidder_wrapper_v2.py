@@ -887,7 +887,10 @@ class PoizonAutoBidderWorker:
                     # 첫 번째 컴럼이 KR 사이즈라고 가정
                     kr_size = cells[0].text.strip()
                     
-                    if kr_size and kr_size.replace('.', '').isdigit():
+                    # 숫자 사이즈와 텍스트 사이즈(S, M, L, XL 등) 모두 처리
+                    if kr_size and (kr_size.replace('.', '').isdigit() or 
+                                  kr_size.upper() in ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL', '2XL', '3XL', '4XL', '5XL'] or
+                                  any(char.isalpha() for char in kr_size)):  # 문자가 포함된 경우도 처리
                         size_mapping[kr_size] = {
                             'KR': kr_size
                         }
@@ -1319,13 +1322,13 @@ class PoizonAutoBidderWorker:
                         eu_tab.click()
                         active_tab = 'EU'
                         self.log_to_queue("[OK] EU 탭 사용 결정 - Size Chart 기반 CM 변환 예정")
-                except:
-                    # 다른 탭 찾기
-                    tabs = self.driver.find_elements(By.XPATH, "//div[@class='tabItem___vEvcb']")
-                    if tabs:
-                        tabs[0].click()
-                        active_tab = tabs[0].text
-                        self.log_to_queue(f"[OK] {active_tab} 탭 사용")
+                    except:
+                        # 다른 탭 찾기
+                        tabs = self.driver.find_elements(By.XPATH, "//div[@class='tabItem___vEvcb']")
+                        if tabs:
+                            tabs[0].click()
+                            active_tab = tabs[0].text
+                            self.log_to_queue(f"[OK] {active_tab} 탭 사용")
             else:
                 self.log_to_queue("[ERROR] Size Chart 읽기 실패")
                 return matched
@@ -1391,6 +1394,18 @@ class PoizonAutoBidderWorker:
                 
                 # 먼저 원본 사이즈로 시도
                 target_size = target_size_original
+            elif size.upper() in ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL', '2XL', '3XL', '4XL', '5XL']:
+                # 텍스트 사이즈는 그대로 사용
+                target_size = size.upper()
+                self.log_to_queue(f"[DEBUG] 텍스트 사이즈 감지: {target_size}")
+                
+                # Size Chart가 있고 텍스트 사이즈가 매핑되어 있으면 변환 시도
+                if 'size_chart' in locals() and size_chart and size.upper() in size_chart:
+                    if active_tab in size_chart[size.upper()]:
+                        converted_size = size_chart[size.upper()][active_tab]
+                        if converted_size and converted_size != '-':
+                            self.log_to_queue(f"[DEBUG] Size Chart 기반 텍스트 사이즈 변환: {size} → {active_tab}: {converted_size}")
+                            target_size = converted_size
             elif 'size_chart' in locals() and size_chart and size in size_chart:
                 # Size Chart가 있을 때 변환 처리
                 if active_tab == 'EU' and 'CM' in size_chart[size]:
@@ -1438,6 +1453,9 @@ class PoizonAutoBidderWorker:
                         console.log('[DEBUG] 아이템 ' + j + ': ' + items[j].textContent.trim());
                     }
                     
+                    // 텍스트 사이즈인지 확인
+                    var isTextSize = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL', '2XL', '3XL', '4XL', '5XL'].indexOf(targetSize.toUpperCase()) !== -1;
+                    
                     for (var i = 0; i < items.length; i++) {
                         var item = items[i];
                         var text = item.textContent.trim();
@@ -1445,30 +1463,50 @@ class PoizonAutoBidderWorker:
                         // 이미 선택된 항목 스킵
                         if (item.classList.contains('selected')) continue;
                         
-                        // 사이즈 체크 - 다양한 패턴 시도
-                        // 패턴1: "탭명 사이즈" 형식 ("JP 260")
-                        // 패턴2: 사이즈만 ("260")
-                        // 패턴3: 공백 없이 붙어있는 경우 ("JP260")
-                        
-                        var pattern1 = ' ' + targetSize + ' ';  // 공백으로 둘러싸인 사이즈
-                        var pattern2 = ' ' + targetSize;        // 뒤에만 공백
-                        var pattern3 = targetSize + ' ';        // 앞에만 공백
-                        
-                        if (text.indexOf(pattern1) !== -1 || 
-                            text.endsWith(pattern2) || 
-                            text.startsWith(pattern3) ||
-                            text === targetSize) {
-                            console.log('[DEBUG] 매칭 성공: ' + text);
-                            // 색상 체크 (필요한 경우만)
-                            if (needColorMatch && targetColor) {
-                                // 타겟 색상이 지정되었으면 해당 색상이 포함되어야 함
-                                if (!text.includes(targetColor)) {
-                                    console.log('[DEBUG] 색상 불일치: ' + text + ' (필요 색상: ' + targetColor + ')');
-                                    continue;
+                        if (isTextSize) {
+                            // 텍스트 사이즈 매칭 (대소문자 무시)
+                            var upperText = text.toUpperCase();
+                            var upperTarget = targetSize.toUpperCase();
+                            
+                            // 정확히 일치하거나 포함하는 경우
+                            if (upperText === upperTarget || 
+                                upperText.indexOf(' ' + upperTarget + ' ') !== -1 ||
+                                upperText.indexOf(' ' + upperTarget) !== -1 ||
+                                upperText.indexOf(upperTarget + ' ') !== -1) {
+                                console.log('[DEBUG] 텍스트 사이즈 매칭 성공: ' + text);
+                                
+                                // 색상 체크 (필요한 경우만)
+                                if (needColorMatch && targetColor) {
+                                    if (!text.includes(targetColor)) {
+                                        console.log('[DEBUG] 색상 불일치: ' + text + ' (필요 색상: ' + targetColor + ')');
+                                        continue;
+                                    }
                                 }
+                                console.log('[DEBUG] 최종 매칭 성공: ' + text);
+                                return item;
                             }
-                            console.log('[DEBUG] 최종 매칭 성공: ' + text);
-                            return item;
+                        } else {
+                            // 숫자 사이즈 매칭 (기존 로직)
+                            var pattern1 = ' ' + targetSize + ' ';  // 공백으로 둘러싸인 사이즈
+                            var pattern2 = ' ' + targetSize;        // 뒤에만 공백
+                            var pattern3 = targetSize + ' ';        // 앞에만 공백
+                            
+                            if (text.indexOf(pattern1) !== -1 || 
+                                text.endsWith(pattern2) || 
+                                text.startsWith(pattern3) ||
+                                text === targetSize) {
+                                console.log('[DEBUG] 매칭 성공: ' + text);
+                                // 색상 체크 (필요한 경우만)
+                                if (needColorMatch && targetColor) {
+                                    // 타겟 색상이 지정되었으면 해당 색상이 포함되어야 함
+                                    if (!text.includes(targetColor)) {
+                                        console.log('[DEBUG] 색상 불일치: ' + text + ' (필요 색상: ' + targetColor + ')');
+                                        continue;
+                                    }
+                                }
+                                console.log('[DEBUG] 최종 매칭 성공: ' + text);
+                                return item;
+                            }
                         }
                     }
                     return null;
@@ -2338,6 +2376,154 @@ class PoizonBidderWrapperV2:
                 'message': str(e),
                 'timestamp': datetime.now().isoformat()
             }
+    
+    def extract_abcmart_links(self, search_keyword: str, max_pages: int = 10) -> List[str]:
+        """
+        ABC마트에서 검색어로 상품 링크 추출 (페이지네이션 처리)
+        
+        Args:
+            search_keyword: 검색할 키워드 (예: "나이키", "뉴발란스")
+            max_pages: 최대 검색할 페이지 수 (기본값: 10)
+            
+        Returns:
+            추출된 상품 링크 리스트
+        """
+        logger.info(f"ABC마트 링크 추출 시작: 검색어='{search_keyword}', 최대 페이지={max_pages}")
+        
+        # Selenium 드라이버 설정
+        try:
+            from selenium import webdriver
+            from selenium.webdriver.common.by import By
+            from selenium.webdriver.support.ui import WebDriverWait
+            from selenium.webdriver.support import expected_conditions as EC
+            from selenium.common.exceptions import TimeoutException, NoSuchElementException
+            import urllib.parse
+            
+            # Chrome 옵션 설정
+            chrome_options = webdriver.ChromeOptions()
+            chrome_options.add_argument("--no-sandbox")
+            chrome_options.add_argument("--disable-dev-shm-usage")
+            chrome_options.add_argument("--disable-gpu")
+            chrome_options.add_argument("--window-size=1920,1080")
+            chrome_options.add_argument("--disable-blink-features=AutomationControlled")
+            chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
+            chrome_options.add_experimental_option('useAutomationExtension', False)
+            
+            # 드라이버 생성
+            driver = webdriver.Chrome(
+                service=Service(self.driver_path),
+                options=chrome_options
+            )
+            
+            wait = WebDriverWait(driver, 10)
+            
+            # 추출된 링크들을 저장할 세트 (중복 제거)
+            all_links = set()
+            
+            # URL 인코딩된 검색어
+            encoded_keyword = urllib.parse.quote(search_keyword)
+            
+            # 페이지네이션 처리
+            for page in range(1, max_pages + 1):
+                try:
+                    # ABC마트 검색 URL (페이지 포함)
+                    search_url = f"https://abcmart.a-rt.com/display/search-word/result?searchWord={encoded_keyword}&page={page}"
+                    logger.info(f"페이지 {page} 접속: {search_url}")
+                    
+                    driver.get(search_url)
+                    time.sleep(3)  # 페이지 로드 대기
+                    
+                    # 상품 링크 추출
+                    product_links = []
+                    
+                    # 여러 선택자로 시도
+                    selectors = [
+                        'a[href*="product?prdtNo="]',
+                        'a[href*="prdtNo="]',
+                        '.item-list a[href*="prdtNo"]',
+                        '.search-list-wrap a[href*="prdtNo"]',
+                        'div.item a[href*="prdtNo"]'
+                    ]
+                    
+                    for selector in selectors:
+                        try:
+                            elements = driver.find_elements(By.CSS_SELECTOR, selector)
+                            for elem in elements:
+                                href = elem.get_attribute('href')
+                                if href and 'prdtNo=' in href:
+                                    # 상품 번호 추출
+                                    match = re.search(r'prdtNo=(\d+)', href)
+                                    if match:
+                                        product_id = match.group(1)
+                                        # 표준 형식으로 저장
+                                        product_link = f"https://abcmart.a-rt.com/product?prdtNo={product_id}"
+                                        product_links.append(product_link)
+                        except Exception as e:
+                            logger.debug(f"선택자 {selector} 실패: {e}")
+                    
+                    # 이번 페이지에서 찾은 링크 수
+                    page_links = set(product_links)
+                    new_links = page_links - all_links
+                    all_links.update(page_links)
+                    
+                    logger.info(f"페이지 {page}: {len(new_links)}개 새 링크 발견 (전체: {len(all_links)}개)")
+                    
+                    # 상품이 없으면 종료
+                    if len(page_links) == 0:
+                        logger.info(f"페이지 {page}에 상품이 없습니다. 검색 종료.")
+                        break
+                    
+                    # 다음 페이지가 없는지 확인 (선택사항)
+                    try:
+                        # 페이지네이션 확인 - 현재 페이지가 마지막인지
+                        pagination = driver.find_elements(By.CSS_SELECTOR, '.pagination a, .paging a')
+                        if pagination:
+                            current_page_elem = driver.find_element(By.CSS_SELECTOR, '.pagination .active, .paging .on')
+                            if current_page_elem and current_page_elem.text == str(page):
+                                # 다음 페이지 버튼이 비활성화되었는지 확인
+                                next_disabled = driver.find_elements(By.CSS_SELECTOR, '.pagination .next.disabled, .paging .next.disabled')
+                                if next_disabled:
+                                    logger.info("마지막 페이지입니다.")
+                                    break
+                    except:
+                        pass  # 페이지네이션 확인 실패해도 계속 진행
+                    
+                except TimeoutException:
+                    logger.warning(f"페이지 {page} 로드 시간 초과")
+                    break
+                except Exception as e:
+                    logger.error(f"페이지 {page} 처리 중 오류: {e}")
+                    break
+            
+            # 결과 저장 (선택사항)
+            if all_links:
+                timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                output_file = f"C:/poison_final/logs/abcmart_links_{search_keyword}_{timestamp}.txt"
+                
+                try:
+                    os.makedirs(os.path.dirname(output_file), exist_ok=True)
+                    with open(output_file, 'w', encoding='utf-8') as f:
+                        f.write(f"# ABC마트 상품 링크 추출 결과\n")
+                        f.write(f"# 검색어: {search_keyword}\n")
+                        f.write(f"# 추출 시간: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+                        f.write(f"# 총 {len(all_links)}개 상품\n")
+                        f.write("=" * 50 + "\n\n")
+                        for link in sorted(all_links):
+                            f.write(f"{link}\n")
+                    
+                    logger.info(f"링크 파일 저장 완료: {output_file}")
+                except Exception as e:
+                    logger.error(f"파일 저장 실패: {e}")
+            
+        except Exception as e:
+            logger.error(f"ABC마트 링크 추출 실패: {e}")
+            all_links = set()
+        finally:
+            if 'driver' in locals():
+                driver.quit()
+        
+        logger.info(f"ABC마트 링크 추출 완료: 총 {len(all_links)}개")
+        return list(all_links)
 
 
 # 테스트용
