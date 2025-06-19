@@ -190,12 +190,13 @@ class AutoBidding:
         logger.debug(f"{channel_info['name']} URL 생성: {search_url[:80]}...")
         return search_url
     
-    def _extract_links_from_page(self, site: str) -> List[str]:
+    def _extract_links_from_page(self, site: str, channel_info: Dict[str, str] = None) -> List[str]:
         """
         현재 페이지에서 링크 추출
         
         Args:
             site: 사이트 이름 (abcmart/musinsa)
+            channel_info: 채널 정보 (도메인, 채널ID, 이름 포함) - ABC마트 계열에만 사용
             
         Returns:
             추출된 링크 목록
@@ -224,8 +225,12 @@ class AutoBidding:
                             match = re.search(r'prdtNo=(\d+)', href)
                             if match:
                                 product_id = match.group(1)
-                                # 표준 형식으로 저장
-                                link = f"https://abcmart.a-rt.com/product?prdtNo={product_id}"
+                                # 표준 형식으로 저장 (채널 정보가 있으면 해당 도메인 사용)
+                                if channel_info:
+                                    domain = channel_info['domain']
+                                    link = f"https://{domain}.a-rt.com/product?prdtNo={product_id}"
+                                else:
+                                    link = f"https://abcmart.a-rt.com/product?prdtNo={product_id}"
                                 if link not in links:
                                     links.append(link)
                 
@@ -422,7 +427,7 @@ class AutoBidding:
                         time.sleep(page_wait_time)
                         
                         # 링크 추출
-                        page_links_new = self._extract_links_from_page(site)
+                        page_links_new = self._extract_links_from_page(site, channel_info)
                         
                         if not page_links_new:
                             empty_page_count += 1
