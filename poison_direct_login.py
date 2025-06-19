@@ -76,18 +76,26 @@ def login_to_poison():
         
         # 2. 국가 코드 선택 (South Korea +82)
         logger.info("국가 코드 선택...")
-        # 드롭다운 화살표 클릭
-        country_dropdown = wait.until(
-            EC.element_to_be_clickable((By.CLASS_NAME, "ant-select-arrow"))
+        # 국가 선택 영역 전체 클릭 (화살표 대신)
+        country_selector = wait.until(
+            EC.element_to_be_clickable((By.CSS_SELECTOR, ".countrySelect___rlSKW .ant-select-selector"))
         )
-        country_dropdown.click()
+        country_selector.click()
         time.sleep(1)
         
         # South Korea 옵션 찾아서 클릭
-        korea_option = driver.find_element(
-            By.XPATH, "//div[contains(@title, 'South Korea +82')]"
-        )
-        korea_option.click()
+        try:
+            # 옵션 리스트에서 South Korea 찾기
+            korea_option = wait.until(
+                EC.element_to_be_clickable((By.XPATH, "//div[@class='ant-select-item-option-content' and contains(text(), 'South Korea')]"))
+            )
+            korea_option.click()
+        except:
+            # 다른 방법으로 시도
+            korea_option = driver.find_element(
+                By.XPATH, "//div[contains(@title, 'South Korea +82')]"
+            )
+            korea_option.click()
         time.sleep(1)
         
         # 3. 비밀번호 입력
