@@ -65,7 +65,16 @@ def login_to_poison():
         logger.info("로그인 페이지 감지. 자동 로그인 시작...")
         wait = WebDriverWait(driver, 10)
         
-        # 1. 국가 코드 선택 (South Korea +82)
+        # 1. 전화번호 입력 (국가 코드 선택 전에)
+        logger.info(f"전화번호 입력: {PHONE_NUMBER}")
+        phone_input = wait.until(
+            EC.presence_of_element_located((By.ID, "mobile_number"))
+        )
+        phone_input.clear()
+        phone_input.send_keys(PHONE_NUMBER)
+        time.sleep(1)
+        
+        # 2. 국가 코드 선택 (South Korea +82)
         logger.info("국가 코드 선택...")
         country_select = wait.until(
             EC.element_to_be_clickable((By.ID, "mobile_code"))
@@ -78,15 +87,6 @@ def login_to_poison():
             By.XPATH, "//div[contains(@title, 'South Korea +82')]"
         )
         korea_option.click()
-        time.sleep(1)
-        
-        # 2. 전화번호 입력
-        logger.info(f"전화번호 입력: {PHONE_NUMBER}")
-        phone_input = wait.until(
-            EC.presence_of_element_located((By.ID, "mobile_number"))
-        )
-        phone_input.clear()
-        phone_input.send_keys(PHONE_NUMBER)
         time.sleep(1)
         
         # 3. 비밀번호 입력
