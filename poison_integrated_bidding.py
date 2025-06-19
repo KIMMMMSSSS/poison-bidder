@@ -13,6 +13,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 
+# 상태 추적을 위한 상수 import
+import status_constants
+
 # 포이즌 직접 로그인 import
 from poison_direct_login import login_to_poison
 
@@ -157,7 +160,7 @@ class AutoBiddingAdapter:
         self.worker_count = worker_count
         self.poison_bidder = None
         
-    def run_with_poison(self, items: List[Dict[str, Any]]) -> Dict[str, Any]:
+    def run_with_poison(self, items: List[Dict[str, Any]], status_callback=None) -> Dict[str, Any]:
         """
         포이즌으로 입찰 실행 - 실제 0923_fixed_multiprocess_cookie_v2.py 사용
         
@@ -187,6 +190,15 @@ class AutoBiddingAdapter:
             
             logger.info("포이즌 입찰 시작 (PoizonBidderWrapperV2 사용)")
             logger.info(f"입력 아이템 수: {len(items)}")
+            
+            # 입찰 시작 콜백
+            if status_callback:
+                status_callback(
+                    status_constants.STAGE_BIDDING,
+                    80,
+                    f"포이즌 플랫폼에서 {len(items)}개 상품 입찰을 시작합니다.",
+                    {"total_items": len(items)}
+                )
             
             # 상세 파라미터 정보 로깅
             logger.info(f"첫 번째 아이템 타입: {type(items[0]) if items else 'N/A'}")
@@ -220,11 +232,35 @@ class AutoBiddingAdapter:
                 worker_count=self.worker_count
             )
             
+            # 입찰 진행 중 콜백
+            if status_callback:
+                status_callback(
+                    status_constants.STAGE_BIDDING,
+                    85,
+                    "포이즌 입찰이 진행 중입니다...",
+                    {"status": "processing"}
+                )
+            
             # 입찰 실행 (unified_items 파라미터 사용)
             result = self.poison_bidder.run_bidding(unified_items=items)
             
             # 결과 로깅
-            logger.info(f"포이즌 입찰 완료 - 성공: {result.get('success', 0)}/{result.get('total_codes', 0)}")
+            success_count = result.get('success', 0)
+            total_count = result.get('total_codes', 0)
+            logger.info(f"포이즌 입찰 완료 - 성공: {success_count}/{total_count}")
+            
+            # 입찰 완료 콜백
+            if status_callback:
+                status_callback(
+                    status_constants.STAGE_BIDDING,
+                    95,
+                    f"포이즌 입찰 완료: {success_count}/{total_count} 성공",
+                    {
+                        "successful": success_count,
+                        "failed": result.get('failed', 0),
+                        "total": total_count
+                    }
+                )
             
             # 결과 형식 통일
             return {
@@ -241,11 +277,31 @@ class AutoBiddingAdapter:
             # 타입 오류는 즉시 재발생
             logger.error(f"TypeError 발생: {e}")
             logger.error(f"items 타입: {type(items)}, items 첫 5개: {items[:5] if isinstance(items, list) else items}")
+            
+            # 오류 콜백
+            if status_callback:
+                status_callback(
+                    status_constants.STAGE_ERROR,
+                    0,
+                    f"타입 오류: {str(e)}",
+                    {"error": str(e), "error_type": "TypeError"}
+                )
+            
             raise
             
         except ValueError as e:
             # 값 오류도 즉시 재발생
             logger.error(f"ValueError 발생: {e}")
+            
+            # 오류 콜백
+            if status_callback:
+                status_callback(
+                    status_constants.STAGE_ERROR,
+                    0,
+                    f"값 오류: {str(e)}",
+                    {"error": str(e), "error_type": "ValueError"}
+                )
+            
             raise
             
         except Exception as e:
@@ -257,6 +313,15 @@ class AutoBiddingAdapter:
             import traceback
             logger.error("Traceback:")
             logger.error(traceback.format_exc())
+            
+            # 오류 콜백
+            if status_callback:
+                status_callback(
+                    status_constants.STAGE_ERROR,
+                    0,
+                    f"예상치 못한 오류: {str(e)}",
+                    {"error": str(e), "error_type": type(e).__name__, "traceback": traceback.format_exc()}
+                )
             
             return {
                 'status': 'error',

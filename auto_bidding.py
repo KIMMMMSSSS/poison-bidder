@@ -842,7 +842,7 @@ class AutoBidding:
                     })
                 
                 # 포이즌로 입찰 실행
-                bid_result = adapter.run_with_poison(items)
+                bid_result = adapter.run_with_poison(items, status_callback)
                 
                 # 결과 변환
                 if bid_result['status'] == 'success':
