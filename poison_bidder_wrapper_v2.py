@@ -55,6 +55,10 @@ PRICE_STEP = 1000     # 가격 조정 단위
 MAX_RETRIES = 3       # 재시도 횟수
 DEFAULT_WAIT_TIME = 15  # 기본 대기 시간
 
+# 포이즌 로그인 계정 정보 (poison_direct_login.py와 동일)
+PHONE_NUMBER = "1099209275"  # 포이즌 계정 전화번호
+PASSWORD = "99006622kK"      # 포이즌 계정 비밀번호
+
 # 브랜드별 검색 규칙
 BRAND_SEARCH_RULES = {
     "반스": "remove_last_1",      # VN0001 → VN000
