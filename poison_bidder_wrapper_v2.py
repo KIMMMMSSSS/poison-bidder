@@ -217,7 +217,15 @@ def worker_process_wrapper(worker_id, task_queue, result_queue, status_dict, log
             chrome_options.add_experimental_option('useAutomationExtension', False)
             
             # Chrome 드라이버 초기화
-            bidder.driver = webdriver.Chrome(service=Service(driver_path), options=chrome_options)
+            try:
+                # webdriver-manager를 사용하여 자동으로 드라이버 관리
+                from webdriver_manager.chrome import ChromeDriverManager
+                bidder.driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
+            except Exception as fallback_error:
+                # fallback: 기존 방식 시도
+                result_queue.put(("LOG", f"[Worker {worker_id}] webdriver-manager 실패, 기존 방식 시도..."))
+                bidder.driver = webdriver.Chrome(service=Service(driver_path), options=chrome_options)
+            
             bidder.wait = WebDriverWait(bidder.driver, DEFAULT_WAIT_TIME)
             
             result_queue.put(("LOG", f"[Worker {worker_id}] Chrome 드라이버 초기화 성공!"))
