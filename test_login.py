@@ -46,12 +46,15 @@ def main():
         print("\n사이트를 선택하세요:")
         print("1. 무신사 (musinsa)")
         print("2. ABC마트 (abcmart)")
-        choice = input("\n선택 (1 또는 2): ")
+        print("3. 포이즌 (poison) - 입찰 사이트")
+        choice = input("\n선택 (1, 2 또는 3): ")
         
         if choice == "1":
             site = "musinsa"
         elif choice == "2":
             site = "abcmart"
+        elif choice == "3":
+            site = "poison"
         else:
             print("잘못된 선택입니다.")
             return

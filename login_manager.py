@@ -59,6 +59,14 @@ class LoginManager:
                 "id_field": "loginId",
                 "pw_field": "loginPw",
                 "login_button": ".login-btn"
+            },
+            "poison": {
+                "login_url": "https://poison-seller.com/login",  # 실제 URL로 변경 필요
+                "home_url": "https://poison-seller.com",
+                "login_check_selector": ".user-info",  # 실제 셀렉터로 변경 필요
+                "id_field": "username",  # 실제 필드명으로 변경 필요
+                "pw_field": "password",  # 실제 필드명으로 변경 필요
+                "login_button": "button[type='submit']"  # 실제 버튼으로 변경 필요
             }
         }
         

@@ -338,6 +338,26 @@ class AutoBidding:
         """자동 입찰 실행"""
         results = []
         
+        # 포이즌 사이트 로그인 확인
+        if LOGIN_MANAGER_AVAILABLE:
+            logger.info("포이즌 사이트 로그인 확인 중...")
+            poison_login = LoginManager("poison")
+            
+            if not poison_login.ensure_login():
+                logger.error("포이즌 사이트 로그인 실패!")
+                logger.error("입찰을 실행하려면 포이즌 사이트에 로그인해야 합니다.")
+                logger.info("python test_login.py poison 명령으로 로그인하세요.")
+                return [{
+                    'item': item.get('name', item['link']),
+                    'success': False,
+                    'message': '포이즌 사이트 로그인 필요',
+                    'timestamp': datetime.now().isoformat()
+                } for item in items]
+            
+            logger.info("포이즌 사이트 로그인 확인 완료")
+            # 여기서 poison_login.driver를 사용해서 실제 입찰 실행
+            # TODO: 실제 입찰 로직 구현
+        
         for item in items:
             # 실제 입찰 로직은 구현 필요
             # 여기서는 시뮬레이션
