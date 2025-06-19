@@ -1,0 +1,21 @@
+{
+  "timestamp": "2025-06-19T23:56:00.780008",
+  "tests": {
+    "poison_integrated_bidding": {
+      "success": true,
+      "message": "성공"
+    },
+    "poison_bidder_wrapper_v2": {
+      "success": true,
+      "message": "성공"
+    },
+    "auto_bidding": {
+      "success": true,
+      "message": "성공"
+    },
+    "unified_bidding": {
+      "success": true,
+      "message": "성공"
+    }
+  }
+}

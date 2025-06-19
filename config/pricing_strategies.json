@@ -1,70 +1,13 @@
 {
   "strategies": {
     "basic": {
-      "name": "기본 전략",
-      "description": "최소한의 할인만 적용하는 보수적인 전략",
       "enabled": true,
       "adjustments": {
-        "coupon": {
+        "base": {
           "enabled": true,
-          "rate": 0.05,
-          "max_amount": 5000,
-          "description": "기본 쿠폰 5% 할인"
-        },
-        "point": {
-          "enabled": true,
-          "rate": 0.01,
-          "max_amount": 1000,
-          "description": "포인트 1% 적립"
-        },
-        "musinsa_card": {
-          "enabled": false,
-          "rate": 0.0,
-          "max_amount": 0,
-          "description": "무신사 카드 미사용"
-        },
-        "cashback": {
-          "enabled": false,
-          "rate": 0.0,
-          "max_amount": 0,
-          "description": "캐시백 미사용"
+          "rate": 0.05
         }
-      },
-      "total_max_discount_rate": 0.06,
-      "priority": 1
-    },
-    "standard": {
-      "name": "표준 전략",
-      "description": "일반적인 할인율을 적용하는 균형잡힌 전략",
-      "enabled": true,
-      "adjustments": {
-        "coupon": {
-          "enabled": true,
-          "rate": 0.10,
-          "max_amount": 10000,
-          "description": "표준 쿠폰 10% 할인"
-        },
-        "point": {
-          "enabled": true,
-          "rate": 0.03,
-          "max_amount": 3000,
-          "description": "포인트 3% 적립"
-        },
-        "musinsa_card": {
-          "enabled": true,
-          "rate": 0.02,
-          "max_amount": 2000,
-          "description": "무신사 카드 2% 추가 할인"
-        },
-        "cashback": {
-          "enabled": false,
-          "rate": 0.0,
-          "max_amount": 0,
-          "description": "캐시백 미사용"
-        }
-      },
-      "total_max_discount_rate": 0.15,
-      "priority": 2
+      }
     }
   }
 }
