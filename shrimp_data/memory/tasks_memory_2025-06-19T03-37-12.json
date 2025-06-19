@@ -1,0 +1,57 @@
+{
+  "tasks": [
+    {
+      "id": "c1b00120-5c39-4c1f-afdb-1132f6da3c40",
+      "name": "기본 스크래퍼 구조 생성",
+      "description": "무신사 스크래퍼(musinsa_scraper_improved.py)를 복사하여 ABC마트 스크래퍼 기본 구조 생성. 클래스명과 함수명을 ABC마트용으로 변경하고, 파일 경로 및 로그 설정 수정",
+      "notes": "기존 코드 구조를 최대한 유지하면서 필요한 부분만 수정",
+      "status": "completed",
+      "dependencies": [],
+      "createdAt": "2025-06-17T22:29:06.023Z",
+      "updatedAt": "2025-06-17T22:41:25.224Z",
+      "relatedFiles": [
+        {
+          "path": "C:/poison_final/musinsa_scraper_improved.py",
+          "type": "REFERENCE",
+          "description": "기반이 되는 무신사 스크래퍼"
+        },
+        {
+          "path": "C:/poison_final/abcmart_scraper_improved.py",
+          "type": "CREATE",
+          "description": "생성할 ABC마트 스크래퍼"
+        }
+      ],
+      "implementationGuide": "1. musinsa_scraper_improved.py를 abcmart_scraper_improved.py로 복사\n2. 클래스명 변경: MusinsaWorker → AbcmartWorker, MusinsaMultiprocessScraper → AbcmartMultiprocessScraper\n3. 함수명 변경: close_musinsa_popup → close_abcmart_popup\n4. 파일 경로 변경: musinsa_* → abcmart_*\n5. 로거 초기화시 'abcmart' 접두사 사용",
+      "verificationCriteria": "abcmart_scraper_improved.py 파일이 생성되고, 모든 클래스명과 함수명이 ABC마트용으로 변경되었는지 확인",
+      "analysisResult": "ABC마트 웹사이트의 신발 제품 정보를 스크래핑하는 Python 도구 개발. 무신사 스크래퍼의 멀티프로세싱 구조를 90% 재사용하여 개발 효율성 극대화. ABC마트 특화 기능 구현에 집중.",
+      "summary": "ABC마트 스크래퍼 기본 구조를 성공적으로 생성했습니다. 무신사 스크래퍼를 기반으로 클래스명, 함수명, 파일 경로를 모두 ABC마트용으로 변경했으며, 로그인 관련 코드를 제거하고 URL 검증 로직을 ABC마트 도메인으로 수정했습니다.",
+      "completedAt": "2025-06-17T22:41:25.223Z"
+    },
+    {
+      "id": "9c56aec3-24cd-40a4-b3c9-579651157396",
+      "name": "ABC마트 URL 검증 구현",
+      "description": "ABC마트 사이트(abcmart.a-rt.com)에 맞는 URL 검증 로직 구현. 로그인과 팝업 처리는 불필요",
+      "notes": "ABC마트는 로그인 없이 접근 가능",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "c1b00120-5c39-4c1f-afdb-1132f6da3c40"
+        }
+      ],
+      "createdAt": "2025-06-17T22:29:06.023Z",
+      "updatedAt": "2025-06-17T22:50:27.871Z",
+      "relatedFiles": [
+        {
+          "path": "C:/poison_final/abcmart_scraper_improved.py",
+          "type": "TO_MODIFY",
+          "description": "URL 검증 및 로그인 로직 수정"
+        }
+      ],
+      "implementationGuide": "1. URL 검증: 'abcmart.a-rt.com' 도메인 체크\n2. 로그인 관련 코드 모두 제거 (manual_login 함수 제거)\n3. 쿠키 관련 코드 제거\n4. get_urls_from_user() 함수에서 ABC마트 URL 검증만 유지",
+      "verificationCriteria": "ABC마트 URL만 허용하고, 로그인이 정상적으로 처리되며, 쿠키가 abcmart_cookies.pkl에 저장되는지 확인",
+      "analysisResult": "ABC마트 웹사이트의 신발 제품 정보를 스크래핑하는 Python 도구 개발. 무신사 스크래퍼의 멀티프로세싱 구조를 90% 재사용하여 개발 효율성 극대화. ABC마트 특화 기능 구현에 집중.",
+      "summary": "ABC마트 URL 검증 로직을 성공적으로 구현했습니다. 로그인 관련 코드와 쿠키 처리를 모두 제거하고, URL 검증은 'abcmart.a-rt.com' 도메인만 허용하도록 설정했습니다. 불필요한 import도 정리했습니다.",
+      "completedAt": "2025-06-17T22:50:27.870Z"
+    }
+  ]
+}

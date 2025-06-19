@@ -1,0 +1,40 @@
+{
+  "tasks": [
+    {
+      "id": "35c625e8-95bd-493d-8207-ba1b3efc89fd",
+      "name": "나이키 제품 상세 페이지 접근",
+      "description": "ABC마트 검색 결과에서 나이키 제품을 선택하여 상세 페이지로 이동합니다. 현재 검색 결과 페이지에 515개의 나이키 제품이 표시된 상태에서 첫 번째 제품을 클릭합니다.",
+      "notes": "검색 결과가 동적으로 로드되므로 충분한 대기 시간 필요",
+      "status": "completed",
+      "dependencies": [],
+      "createdAt": "2025-06-16T22:48:35.998Z",
+      "updatedAt": "2025-06-16T23:02:06.276Z",
+      "relatedFiles": [],
+      "implementationGuide": "1. browser_wait_for를 사용하여 검색 결과 로드 대기\\n2. browser_snapshot으로 현재 페이지 상태 확인\\n3. 첫 번째 제품 링크 요소 찾기\\n4. browser_click으로 제품 클릭\\n5. 상세 페이지 로드 대기",
+      "verificationCriteria": "나이키 제품 상세 페이지가 성공적으로 로드되고, URL이 /product 경로를 포함하며, 제품명과 가격이 표시되어야 함",
+      "analysisResult": "ABC마트 웹사이트에서 나이키 제품의 UI 요소를 브라우저 자동화로 분석하는 작업. 사이즈 선택 UI, 가격 정보, 최대혜택가 툴팁 등의 동작을 검증하고 문서화",
+      "summary": "ABC-Mart 나이키 제품 상세 페이지 접근 완료. 상품코드 1010087307 제품의 상세 페이지에 성공적으로 접근하여 정보 추출 준비 완료",
+      "completedAt": "2025-06-16T23:02:06.276Z"
+    },
+    {
+      "id": "5f414c98-7582-451b-9e2b-3f1e04168fa0",
+      "name": "사이즈 선택 UI 구조 분석",
+      "description": "제품 상세 페이지에서 사이즈 선택 UI의 구조를 분석합니다. 재고 상태 표시 방식(sold-out 클래스, disabled 속성)과 사용 가능한 사이즈를 확인합니다.",
+      "notes": "ABC마트는 sold-out 클래스로 품절 상태를 표시하는 것으로 확인됨",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "35c625e8-95bd-493d-8207-ba1b3efc89fd"
+        }
+      ],
+      "createdAt": "2025-06-16T22:48:35.998Z",
+      "updatedAt": "2025-06-16T23:03:15.924Z",
+      "relatedFiles": [],
+      "implementationGuide": "1. browser_snapshot으로 페이지 구조 캡처\\n2. 사이즈 버튼 요소들 찾기\\n3. 각 사이즈 버튼의 클래스와 속성 분석\\n4. sold-out 클래스 유무 확인\\n5. 재고 있는 사이즈 목록 추출",
+      "verificationCriteria": "사이즈 선택 UI의 HTML 구조가 분석되고, 재고 상태 표시 방식이 명확히 문서화되며, 구매 가능한 사이즈가 식별되어야 함",
+      "analysisResult": "ABC마트 웹사이트에서 나이키 제품의 UI 요소를 브라우저 자동화로 분석하는 작업. 사이즈 선택 UI, 가격 정보, 최대혜택가 툴팁 등의 동작을 검증하고 문서화",
+      "summary": "ABC-Mart 사이즈 선택 UI 구조 분석 완료. 품절 표시는 'sold-out' 클래스로 구분되며, 총 15개 사이즈 중 265만 품절 상태로 확인됨. 각 사이즈별 재고 수량도 data-product-option-quantity 속성에서 확인 가능",
+      "completedAt": "2025-06-16T23:03:15.923Z"
+    }
+  ]
+}
