@@ -17,6 +17,9 @@ from typing import List, Dict, Any, Optional
 import traceback
 from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
 
+# 상태 추적을 위한 상수 import
+import status_constants
+
 # Selenium for link extraction
 try:
     from selenium import webdriver
@@ -242,7 +245,7 @@ class AutoBidding:
         return links
     
     def run_auto_pipeline(self, site: str = "musinsa", keywords: Optional[List[str]] = None,
-                         strategy: str = "basic") -> Dict[str, Any]:
+                         strategy: str = "basic", status_callback=None) -> Dict[str, Any]:
         """
         완전 자동화 파이프라인 실행
         
@@ -254,6 +257,14 @@ class AutoBidding:
         start_time = datetime.now()
         logger.info(f"자동화 파이프라인 시작: {site}")
         
+        # 초기화 상태 콜백
+        if status_callback:
+            status_callback(
+                status_constants.STAGE_INITIALIZING,
+                0,
+                f"자동화 파이프라인을 시작합니다. 사이트: {site}"
+            )
+        
         try:
             # 1. 링크 자동 추출
             if not keywords:
@@ -262,9 +273,33 @@ class AutoBidding:
             all_links = []
             keyword_stats = {}  # 키워드별 통계
             
-            for keyword in keywords:
+            # 링크 추출 시작 콜백
+            if status_callback:
+                status_callback(
+                    status_constants.STAGE_LINK_EXTRACTING,
+                    10,
+                    f"검색 키워드 {len(keywords)}개로 링크 추출을 시작합니다."
+                )
+            
+            for i, keyword in enumerate(keywords):
                 logger.info(f"\n키워드 '{keyword}' 검색 중...")
-                links = self._extract_links_auto(site, keyword)
+                
+                # 각 키워드별 진행률 계산
+                keyword_progress = status_constants.calculate_stage_progress(
+                    status_constants.STAGE_LINK_EXTRACTING,
+                    i + 1,
+                    len(keywords)
+                )
+                
+                if status_callback:
+                    status_callback(
+                        status_constants.STAGE_LINK_EXTRACTING,
+                        keyword_progress,
+                        f"'{keyword}' 검색 중...",
+                        {"current_keyword": keyword, "current_item": i + 1, "total_items": len(keywords)}
+                    )
+                
+                links = self._extract_links_auto(site, keyword, status_callback)
                 all_links.extend(links)
                 keyword_stats[keyword] = len(links)
                 logger.info(f"'{keyword}'에서 {len(links)}개 링크 추출")
@@ -293,21 +328,83 @@ class AutoBidding:
             
             self.results['links'] = unique_links
             
+            # 링크 추출 완료 콜백
+            if status_callback:
+                status_callback(
+                    status_constants.STAGE_LINK_EXTRACTING,
+                    30,
+                    f"링크 추출 완료: 총 {len(unique_links)}개",
+                    {"total_links": len(unique_links)}
+                )
+            
             # 2. 상품 정보 스크래핑
             logger.info("상품 정보 수집 중...")
-            items = self._scrape_items_auto(site, unique_links)
+            
+            # 스크래핑 시작 콜백
+            if status_callback:
+                status_callback(
+                    status_constants.STAGE_SCRAPING,
+                    30,
+                    f"{len(unique_links)}개 상품의 정보를 수집합니다."
+                )
+            items = self._scrape_items_auto(site, unique_links, status_callback)
             self.results['items'] = items
             logger.info(f"{len(items)}개 상품 정보 수집 완료")
             
+            # 스크래핑 완료 콜백
+            if status_callback:
+                status_callback(
+                    status_constants.STAGE_SCRAPING,
+                    70,
+                    f"스크래핑 완료: {len(items)}개 상품",
+                    {"total_items": len(items)}
+                )
+            
             # 3. 가격 조정
             logger.info("가격 조정 중...")
+            
+            # 가격 계산 시작 콜백
+            if status_callback:
+                status_callback(
+                    status_constants.STAGE_PRICE_CALCULATING,
+                    70,
+                    f"{len(items)}개 상품의 최적 가격을 계산합니다."
+                )
+            
             adjusted_items = self._apply_pricing_strategy(items, strategy)
             self.results['adjusted_items'] = adjusted_items
             
+            # 가격 계산 완료 콜백
+            if status_callback:
+                status_callback(
+                    status_constants.STAGE_PRICE_CALCULATING,
+                    80,
+                    f"가격 계산 완료: {strategy} 전략 적용"
+                )
+            
             # 4. 입찰 실행
             logger.info("입찰 실행 중...")
-            bid_results = self._execute_auto_bidding(site, adjusted_items)
+            
+            # 입찰 시작 콜백
+            if status_callback:
+                status_callback(
+                    status_constants.STAGE_BIDDING,
+                    80,
+                    f"{len(adjusted_items)}개 상품 입찰을 시작합니다."
+                )
+            
+            bid_results = self._execute_auto_bidding(site, adjusted_items, status_callback)
             self.results['bid_results'] = bid_results
+            
+            # 입찰 완료 콜백
+            successful_bids = sum(1 for r in bid_results if r.get('success', False))
+            if status_callback:
+                status_callback(
+                    status_constants.STAGE_BIDDING,
+                    95,
+                    f"입찰 완료: {successful_bids}/{len(bid_results)} 성공",
+                    {"successful": successful_bids, "total": len(bid_results)}
+                )
             
             # 결과 저장
             self._save_results()
@@ -315,13 +412,27 @@ class AutoBidding:
             # 실행 시간
             execution_time = (datetime.now() - start_time).total_seconds()
             
+            # 완료 콜백
+            if status_callback:
+                status_callback(
+                    status_constants.STAGE_COMPLETED,
+                    100,
+                    "모든 작업이 완료되었습니다!",
+                    {
+                        "total_links": len(unique_links),
+                        "total_items": len(items),
+                        "successful_bids": successful_bids,
+                        "execution_time": execution_time
+                    }
+                )
+            
             return {
                 'status': 'success',
                 'site': site,
                 'keywords': keywords,
                 'total_links': len(unique_links),
                 'total_items': len(items),
-                'successful_bids': sum(1 for r in bid_results if r.get('success', False)),
+                'successful_bids': successful_bids,
                 'execution_time': execution_time,
                 'timestamp': datetime.now().isoformat()
             }
@@ -329,6 +440,16 @@ class AutoBidding:
         except Exception as e:
             logger.error(f"파이프라인 오류: {e}")
             logger.error(traceback.format_exc())
+            
+            # 오류 콜백
+            if status_callback:
+                status_callback(
+                    status_constants.STAGE_ERROR,
+                    0,  # 오류 시 진행률은 유지
+                    f"오류 발생: {str(e)}",
+                    {"error": str(e), "traceback": traceback.format_exc()}
+                )
+            
             return {
                 'status': 'error',
                 'error': str(e),
@@ -339,7 +460,7 @@ class AutoBidding:
                 self.driver.quit()
                 self.driver = None
     
-    def _extract_links_auto(self, site: str, keyword: str) -> List[str]:
+    def _extract_links_auto(self, site: str, keyword: str, status_callback=None) -> List[str]:
         """자동 링크 추출"""
         if not SELENIUM_AVAILABLE:
             logger.error("Selenium이 설치되지 않았습니다.")
@@ -351,17 +472,42 @@ class AutoBidding:
             # 로그인 관리자 사용 (ABC마트는 제외)
             if site != 'abcmart' and LOGIN_MANAGER_AVAILABLE and not self.driver:
                 logger.info("로그인 확인 중...")
+                
+                # 로그인 확인 콜백
+                if status_callback:
+                    status_callback(
+                        status_constants.STAGE_LOGIN_CHECK,
+                        5,
+                        "로그인 상태를 확인하고 있습니다..."
+                    )
+                
                 self.login_manager = LoginManager(site)
                 
                 # 로그인 상태 확인 및 로그인
                 if self.login_manager.ensure_login():
                     self.driver = self.login_manager.driver
                     logger.info("로그인 완료, 검색 시작")
+                    
+                    # 로그인 완료 콜백
+                    if status_callback:
+                        status_callback(
+                            status_constants.STAGE_LOGIN_CHECK,
+                            10,
+                            "로그인 완료"
+                        )
                 else:
                     logger.error("로그인 실패")
                     return []
             elif site == 'abcmart' and not self.driver:
                 logger.info("ABC마트는 로그인 불필요, 직접 검색 시작")
+                
+                # ABC마트 로그인 불필요 콜백
+                if status_callback:
+                    status_callback(
+                        status_constants.STAGE_LOGIN_CHECK,
+                        10,
+                        "ABC마트는 로그인이 필요없습니다"
+                    )
             
             # 드라이버가 없으면 일반 모드로 초기화
             if not self.driver:
@@ -536,7 +682,7 @@ class AutoBidding:
         
         return final_links
     
-    def _scrape_items_auto(self, site: str, links: List[str]) -> List[Dict[str, Any]]:
+    def _scrape_items_auto(self, site: str, links: List[str], status_callback=None) -> List[Dict[str, Any]]:
         """자동 스크래핑"""
         items = []
         
@@ -581,6 +727,20 @@ class AutoBidding:
         for i, link in enumerate(links):
             try:
                 logger.info(f"스크래핑 {i+1}/{len(links)}: {link}")
+                
+                # 스크래핑 진행 상황 콜백
+                if status_callback:
+                    progress = status_constants.calculate_stage_progress(
+                        status_constants.STAGE_SCRAPING,
+                        i + 1,
+                        len(links)
+                    )
+                    status_callback(
+                        status_constants.STAGE_SCRAPING,
+                        progress,
+                        f"상품 정보 수집 중... ({i+1}/{len(links)})",
+                        {"current_item": i + 1, "total_items": len(links)}
+                    )
                 
                 if not self.driver:
                     # 드라이버가 없으면 임시 데이터
@@ -648,7 +808,7 @@ class AutoBidding:
         
         return adjusted_items
     
-    def _execute_auto_bidding(self, site: str, items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def _execute_auto_bidding(self, site: str, items: List[Dict[str, Any]], status_callback=None) -> List[Dict[str, Any]]:
         """자동 입찰 실행"""
         results = []
         
