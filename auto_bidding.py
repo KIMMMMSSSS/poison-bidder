@@ -255,15 +255,30 @@ class AutoBidding:
                 keywords = self.config['search_keywords'].get(site, [])
             
             all_links = []
+            keyword_stats = {}  # 키워드별 통계
+            
             for keyword in keywords:
-                logger.info(f"키워드 '{keyword}' 검색 중...")
+                logger.info(f"\n키워드 '{keyword}' 검색 중...")
                 links = self._extract_links_auto(site, keyword)
                 all_links.extend(links)
+                keyword_stats[keyword] = len(links)
                 logger.info(f"'{keyword}'에서 {len(links)}개 링크 추출")
+            
+            # 전체 통합 통계
+            logger.info(f"\n=== 전체 키워드 통합 결과 ===")
+            for keyword, count in keyword_stats.items():
+                logger.info(f"- {keyword}: {count}개")
+            
+            total_before_dedup = len(all_links)
+            logger.info(f"\n총 수집 링크: {total_before_dedup}개")
             
             # 중복 제거
             unique_links = list(set(all_links))
-            logger.info(f"총 {len(unique_links)}개 고유 링크 추출")
+            total_duplicates = total_before_dedup - len(unique_links)
+            
+            if total_duplicates > 0:
+                logger.info(f"키워드 간 중복 제거: {total_duplicates}개")
+            logger.info(f"최종 고유 링크: {len(unique_links)}개")
             
             # 최대 개수 제한
             max_links = self.config['extraction']['max_links']
@@ -501,7 +516,20 @@ class AutoBidding:
         except Exception as e:
             logger.error(f"링크 추출 오류: {e}")
         
-        return list(set(links))  # 중복 제거
+        # 최종 중복 제거 및 통계
+        final_links_before = len(links)
+        final_links = list(set(links))
+        final_duplicates = final_links_before - len(final_links)
+        
+        # 최종 통계 표시
+        logger.info(f"\n=== 최종 링크 추출 결과 ({site}) ===")
+        logger.info(f"- 총 수집 링크: {final_links_before}개")
+        if final_duplicates > 0:
+            logger.info(f"- 중복 제거: {final_duplicates}개")
+        logger.info(f"- 최종 고유 링크: {len(final_links)}개")
+        logger.info(f"- 키워드: '{keyword}'")
+        
+        return final_links
     
     def _scrape_items_auto(self, site: str, links: List[str]) -> List[Dict[str, Any]]:
         """자동 스크래핑"""
