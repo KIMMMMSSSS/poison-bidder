@@ -86,16 +86,43 @@ def login_to_poison():
         # South Korea 옵션 찾아서 클릭
         try:
             # 옵션 리스트에서 South Korea 찾기
-            korea_option = wait.until(
-                EC.element_to_be_clickable((By.XPATH, "//div[@class='ant-select-item-option-content' and contains(text(), 'South Korea')]"))
+            # 먼저 드롭다운 컨테이너 찾기
+            dropdown_container = wait.until(
+                EC.presence_of_element_located((By.CLASS_NAME, "ant-select-dropdown"))
             )
-            korea_option.click()
+            
+            # JavaScript로 스크롤하면서 South Korea 찾기
+            driver.execute_script("""
+                const dropdown = arguments[0];
+                const options = dropdown.querySelectorAll('.ant-select-item-option');
+                for (let option of options) {
+                    if (option.textContent.includes('South Korea')) {
+                        option.scrollIntoView();
+                        option.click();
+                        break;
+                    }
+                }
+            """, dropdown_container)
+            
+            time.sleep(0.5)
         except:
-            # 다른 방법으로 시도
-            korea_option = driver.find_element(
-                By.XPATH, "//div[contains(@title, 'South Korea +82')]"
-            )
-            korea_option.click()
+            # 대체 방법: 키보드로 찾기
+            try:
+                # 검색 입력 필드에 "South" 입력
+                search_input = driver.find_element(By.CSS_SELECTOR, ".ant-select-dropdown input")
+                search_input.send_keys("South")
+                time.sleep(0.5)
+                
+                # South Korea 선택
+                korea_option = driver.find_element(
+                    By.XPATH, "//div[contains(text(), 'South Korea')]"
+                )
+                korea_option.click()
+            except:
+                # 직접 스크롤하여 찾기
+                logger.warning("수동으로 South Korea를 선택해주세요.")
+                time.sleep(3)
+        
         time.sleep(1)
         
         # 3. 비밀번호 입력
