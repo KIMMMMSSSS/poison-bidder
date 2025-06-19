@@ -220,7 +220,25 @@ class AutoBidding:
                 options.add_argument("--disable-gpu")
                 options.add_argument("--window-size=1920,1080")
                 
-                self.driver = uc.Chrome(options=options, version_main=None)
+                # Chrome 바이너리 경로 찾기
+                chrome_paths = [
+                    r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+                    r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+                    os.path.expandvars(r"%LOCALAPPDATA%\Google\Chrome\Application\chrome.exe"),
+                    os.path.expandvars(r"%PROGRAMFILES%\Google\Chrome\Application\chrome.exe"),
+                    os.path.expandvars(r"%PROGRAMFILES(X86)%\Google\Chrome\Application\chrome.exe")
+                ]
+                
+                for chrome_path in chrome_paths:
+                    if os.path.exists(chrome_path):
+                        options.binary_location = chrome_path
+                        break
+                
+                try:
+                    self.driver = uc.Chrome(options=options, version_main=None)
+                except Exception as e:
+                    logger.error(f"Chrome 드라이버 초기화 실패: {e}")
+                    return []
             
             # 검색 URL 구성
             if site == "musinsa":
