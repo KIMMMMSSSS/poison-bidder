@@ -126,19 +126,54 @@ class PoizonBidderWrapperV2:
         Returns:
             포이즌 입찰 형식의 튜플 리스트
         """
+        # 파라미터 타입 검증
+        if not isinstance(items, list):
+            error_msg = f"TypeError: items는 list 타입이어야 합니다. 받은 타입: {type(items).__name__}"
+            logger.error(error_msg)
+            raise TypeError(error_msg)
+        
+        if not items:
+            logger.warning("prepare_bid_data: 빈 리스트가 전달되었습니다.")
+            return []
+        
         bid_data = []
         
-        logger.debug(f"데이터 변환 시작: {len(items)}개 아이템")
+        logger.info(f"데이터 변환 시작: {len(items)}개 아이템")
         if items and logger.isEnabledFor(logging.DEBUG):
             logger.debug(f"첫 번째 아이템 샘플: {json.dumps(items[0], ensure_ascii=False)}")
         
+        # 필수 필드 정의
+        required_fields = ['brand', 'code', 'size']
+        fields_missing_count = 0
+        
         for idx, item in enumerate(items, 1):
+            # 아이템 타입 검증
+            if not isinstance(item, dict):
+                logger.warning(f"아이템 {idx}가 dict 타입이 아닙니다: {type(item).__name__}. 건너뜁니다.")
+                continue
+            
             # 데이터 추출
             brand = item.get('brand', '')
             code = item.get('code', '')
             color = item.get('color', '')
             size = item.get('size', '')
             price = item.get('adjusted_price', item.get('price', 0))
+            
+            # 필수 필드 검증
+            missing_fields = []
+            for field in required_fields:
+                if not item.get(field):
+                    missing_fields.append(field)
+            
+            if missing_fields:
+                fields_missing_count += 1
+                logger.warning(f"아이템 {idx}(코드: {code or 'N/A'})에 필수 필드 누락: {missing_fields}")
+                if fields_missing_count <= 5:  # 처음 5개만 상세 로깅
+                    logger.debug(f"누락된 필드가 있는 아이템: {item}")
+            
+            # price 검증
+            if price <= 0:
+                logger.warning(f"아이템 {idx}(코드: {code})의 가격이 유효하지 않습니다: {price}")
             
             # 포이즌 형식으로 변환
             bid_data.append((
@@ -150,9 +185,14 @@ class PoizonBidderWrapperV2:
                 price
             ))
             
-        logger.info(f"데이터 변환 완료: {len(bid_data)}개 아이템")
+        # 변환 결과 로깅
+        logger.info(f"데이터 변환 완료: {len(bid_data)}개 아이템으로 변환")
+        if fields_missing_count > 0:
+            logger.warning(f"필수 필드 누락된 아이템 수: {fields_missing_count}개")
+        
         if bid_data and logger.isEnabledFor(logging.DEBUG):
             logger.debug(f"변환된 첫 번째 튜플: {bid_data[0]}")
+            logger.debug(f"데이터 변환 상세 - 입력: {len(items)}개, 출력: {len(bid_data)}개, 누락: {fields_missing_count}개")
         return bid_data
     
     def run_bidding(self, bid_data_file: Optional[str] = None, 
@@ -172,10 +212,33 @@ class PoizonBidderWrapperV2:
         start_time = datetime.now()
         logger.info("=== 포이즌 입찰 시작 ===")
         
-        # 입력 확인
+        # 파라미터 타입 및 입력 확인
         logger.info(f"입력 파라미터 - bid_data_file: {bid_data_file is not None}, "
                    f"bid_data_list: {bid_data_list is not None}, "
                    f"unified_items: {unified_items is not None}")
+        
+        # unified_items 타입 검증
+        if unified_items is not None:
+            logger.info(f"unified_items 타입: {type(unified_items)}")
+            
+            # bool 타입 검증 (True/False)
+            if isinstance(unified_items, bool):
+                error_msg = f"TypeError: unified_items는 bool 타입이 아니어야 합니다. 받은 값: {unified_items}"
+                logger.error(error_msg)
+                raise TypeError(error_msg)
+            
+            # list 타입 검증
+            if not isinstance(unified_items, list):
+                error_msg = f"TypeError: unified_items는 list 타입이어야 합니다. 받은 타입: {type(unified_items).__name__}"
+                logger.error(error_msg)
+                logger.error(f"unified_items 샘플: {str(unified_items)[:100]}...")  # 처음 100자만
+                raise TypeError(error_msg)
+            
+            logger.info(f"unified_items 항목 수: {len(unified_items)}")
+            
+            # 빈 리스트 경고
+            if len(unified_items) == 0:
+                logger.warning("unified_items가 비어있습니다. 입찰할 항목이 없습니다.")
         
         # 데이터 준비
         if unified_items:
