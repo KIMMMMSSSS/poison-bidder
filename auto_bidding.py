@@ -395,7 +395,8 @@ class AutoBidding:
                     page = 1
                     empty_page_count = 0
                     
-                    logger.info(f"\n[{channel_info['name']}] 크롤링 시작 (최대 {max_pages}페이지)")
+                    logger.info(f"\n[{channel_info['name']}] 크롤링 시작 (최대 {max_pages}페이지, 빈 페이지 연속 {empty_threshold}개 시 종료)")
+                    logger.info(f"[{channel_info['name']}] 검색어: '{keyword}', 채널 ID: {channel_info['channel']}")
                     
                     while page <= max_pages:
                         # 채널별 URL 생성
@@ -423,7 +424,8 @@ class AutoBidding:
                         
                         # 진행 상황 로깅 (10페이지마다)
                         if page % 10 == 0:
-                            logger.info(f"[{channel_info['name']}] 진행 상황: {page}페이지 완료, {len(channel_links)}개 링크 수집")
+                            progress_percent = (page / max_pages) * 100
+                            logger.info(f"[{channel_info['name']}] 진행 상황: {page}페이지/{max_pages} ({progress_percent:.1f}%), {len(channel_links)}개 링크 수집")
                         
                         page += 1
                     
@@ -456,6 +458,16 @@ class AutoBidding:
                 logger.info(f"- 채널 내 중복 제거 후: {total_unique_per_channel}개")
                 logger.info(f"- 채널 내 중복: {total_duplicates_per_channel}개")
                 logger.info(f"\n전체 통합 결과: {len(links)}개 링크 (채널 간 중복 포함)")
+                
+                # 채널 간 중복 계산 및 표시
+                links_before_dedup = len(links)
+                links_unique = list(set(links))
+                cross_channel_duplicates = links_before_dedup - len(links_unique)
+                
+                if cross_channel_duplicates > 0:
+                    logger.info(f"\n채널 간 중복 발견: {cross_channel_duplicates}개")
+                    logger.info(f"최종 고유 링크 수: {len(links_unique)}개")
+                    links = links_unique  # 최종 중복 제거된 링크로 업데이트
                 
             else:
                 # 무신사 스크롤 방식
