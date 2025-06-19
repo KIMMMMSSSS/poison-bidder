@@ -1,7 +1,7 @@
 {
   "bot": {
-    "token": "YOUR_BOT_TOKEN_HERE",
-    "admin_ids": [123456789],
+    "token": "7969731255:AAGjoLD5RHrY8j2PqTPZRc0zgwKeFPMTV-8",
+    "admin_ids": [5018034019],
     "command_timeout": 300,
     "update_interval": 5
   },

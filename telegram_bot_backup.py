@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-K-Fashion 자동 입찰 텔레그램 봇 (자동화 기능 포함)
+K-Fashion 자동 입찰 텔레그램 봇
 시스템을 원격으로 제어하고 모니터링
 """
 
@@ -71,19 +71,7 @@ class BiddingBot:
             await update.message.reply_text(self.config['messages']['unauthorized'])
             return
         
-        # 환영 메시지 업데이트
-        welcome_text = """
-🤖 **K-Fashion 자동 입찰 봇**
-
-이제 링크 추출부터 입찰까지 자동으로!
-
-**주요 명령어:**
-• `/auto musinsa 나이키` - 자동화 입찰
-• `/help` - 전체 명령어 보기
-
-시작하려면 `/auto` 명령어를 사용하세요!
-        """
-        await update.message.reply_text(welcome_text, parse_mode='Markdown')
+        await update.message.reply_text(self.config['messages']['welcome'])
     
     async def auto_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """자동화 링크 추출 + 입찰 명령어"""
@@ -101,25 +89,13 @@ class BiddingBot:
         site = args[0] if len(args) > 0 else 'musinsa'
         keywords = args[1:] if len(args) > 1 else None
         
-        # 유효한 사이트인지 확인
-        valid_sites = ['musinsa', 'abcmart']
-        if site not in valid_sites:
-            # site가 키워드일 수도 있음
-            if site and not keywords:
-                keywords = [site]
-                site = 'musinsa'
-            else:
-                await update.message.reply_text(f"❌ 유효하지 않은 사이트: {site}\n사용 가능: {', '.join(valid_sites)}")
-                return
-        
         if not keywords:
             await update.message.reply_text(
                 "🤖 **자동화 입찰**\n\n"
                 "사용법: /auto [site] [keywords...]\n\n"
                 "예시:\n"
                 "`/auto musinsa 나이키 에어포스`\n"
-                "`/auto abcmart 운동화`\n"
-                "`/auto 나이키` (무신사 기본)\n\n"
+                "`/auto abcmart 운동화`\n\n"
                 "키워드를 공백으로 구분하여 입력하세요.",
                 parse_mode='Markdown'
             )
@@ -128,7 +104,7 @@ class BiddingBot:
         # 확인 메시지
         keyboard = [
             [
-                InlineKeyboardButton("✅ 시작", callback_data=f"auto_start_{site}_{~".join(keywords)}"),
+                InlineKeyboardButton("✅ 시작", callback_data=f"auto_start_{site}_{|".join(keywords)}"),
                 InlineKeyboardButton("❌ 취소", callback_data="auto_cancel")
             ]
         ]
@@ -154,25 +130,21 @@ class BiddingBot:
         help_text = """
 📚 **명령어 도움말**
 
-**🤖 자동화 입찰 (추천!)**
-/auto [site] [keywords...] - 링크 추출부터 입찰까지 자동
-  • 예: `/auto 나이키 에어포스`
-  • 예: `/auto musinsa 아디다스`
-  • 예: `/auto abcmart 운동화`
+/start - 봇 시작
+/bid [site] [strategy] - 입찰 시작
+  • site: musinsa, abcmart (기본: musinsa)
+  • strategy: basic, standard, premium (기본: basic)
+  • 예: /bid musinsa standard
 
-**📁 수동 입찰**
-/bid [site] [strategy] - 링크 파일 필요
-  • site: musinsa, abcmart
-  • strategy: basic, standard, premium
-  • 예: `/bid musinsa standard`
-
-**🔧 기타 명령어**
-/status - 현재 작업 상태
-/stop - 작업 중지
-/strategies - 전략 목록
+/status - 현재 작업 상태 확인
+/stop - 진행 중인 작업 중지
+/strategies - 사용 가능한 전략 목록
 /help - 이 도움말
 
-💡 **팁**: 대부분의 경우 `/auto` 명령어만 사용하면 됩니다!
+💡 **사용 예시**
+1. `/bid` - 기본 설정으로 입찰
+2. `/bid abcmart` - ABC마트 입찰
+3. `/bid musinsa premium` - 무신사 프리미엄 전략
         """
         
         await update.message.reply_text(help_text, parse_mode='Markdown')
@@ -221,7 +193,6 @@ class BiddingBot:
             f"🎯 **입찰 설정**\n\n"
             f"사이트: {site}\n"
             f"전략: {strategy}\n\n"
-            f"⚠️ 주의: input/{site}_links.txt 파일이 필요합니다.\n\n"
             f"이대로 진행하시겠습니까?",
             reply_markup=reply_markup,
             parse_mode='Markdown'
@@ -243,18 +214,11 @@ class BiddingBot:
 📊 **현재 작업 상태**
 
 작업 ID: {self.current_task.get('id', 'N/A')}
-작업 유형: {self.current_task.get('type', 'N/A')}
 사이트: {self.current_task.get('site', 'N/A')}
+전략: {self.current_task.get('strategy', 'N/A')}
 시작 시간: {self.current_task.get('start_time', 'N/A')}
 진행 단계: {self.current_task.get('stage', 'N/A')}
             """
-            
-            # 자동화 작업인 경우 추가 정보
-            if self.current_task.get('type') == 'auto':
-                status_text += f"\n키워드: {self.current_task.get('keywords', 'N/A')}"
-            else:
-                status_text += f"\n전략: {self.current_task.get('strategy', 'N/A')}"
-                
             await update.message.reply_text(status_text, parse_mode='Markdown')
         else:
             await update.message.reply_text("작업 정보를 가져올 수 없습니다.")
@@ -314,19 +278,8 @@ class BiddingBot:
             # 비동기로 입찰 실행
             asyncio.create_task(self._run_bidding(query, site, strategy))
             
-        elif data.startswith("auto_start_"):
-            # 자동화 입찰 시작
-            parts = data.split("_", 3)
-            site = parts[2]
-            keywords = parts[3].split("~") if len(parts) > 3 else []
-            
-            await query.edit_message_text("🤖 자동화 입찰을 시작합니다...")
-            
-            # 비동기로 자동 입찰 실행
-            asyncio.create_task(self._run_auto_bidding(query, site, keywords))
-            
-        elif data == "bid_cancel" or data == "auto_cancel":
-            await query.edit_message_text("❌ 취소되었습니다.")
+        elif data == "bid_cancel":
+            await query.edit_message_text("❌ 입찰이 취소되었습니다.")
             
         elif data == "stop_confirm":
             self.is_running = False
@@ -335,99 +288,15 @@ class BiddingBot:
         elif data == "stop_cancel":
             await query.edit_message_text("↩️ 작업을 계속 진행합니다.")
     
-    async def _run_auto_bidding(self, query, site: str, keywords: list):
-        """자동화 입찰 실행 (비동기)"""
-        chat_id = query.message.chat_id
-        
-        try:
-            self.is_running = True
-            self.current_task = {
-                'id': f"AUTO_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
-                'type': 'auto',
-                'site': site,
-                'keywords': ', '.join(keywords),
-                'start_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                'stage': '초기화'
-            }
-            
-            # 진행 상황 업데이트
-            stages = [
-                ('키워드 검색', '검색 페이지 접속 중...'),
-                ('링크 추출', '상품 링크 수집 중...'),
-                ('정보 수집', '상품 정보 스크래핑 중...'),
-                ('가격 계산', '최적 가격 계산 중...'),
-                ('입찰 실행', '입찰 진행 중...')
-            ]
-            
-            for i, (stage, description) in enumerate(stages):
-                if not self.is_running:
-                    break
-                
-                self.current_task['stage'] = stage
-                
-                # 메시지 업데이트
-                progress = "▓" * (i + 1) + "░" * (len(stages) - i - 1)
-                await query.message.chat.send_message(
-                    f"🤖 **자동화 진행 중**\n\n"
-                    f"[{progress}] {(i+1)*20}%\n"
-                    f"단계: {stage}\n"
-                    f"{description}",
-                    parse_mode='Markdown'
-                )
-                
-                # 실제로는 여기서 해당 단계 실행
-                if i == 0:
-                    await asyncio.sleep(3)  # 검색 시간
-                elif i == 1:
-                    await asyncio.sleep(5)  # 링크 추출 시간
-                else:
-                    await asyncio.sleep(2)
-            
-            # 실제 자동 입찰 실행
-            if self.is_running:
-                result = await asyncio.to_thread(
-                    self.auto_bidder.run_auto_pipeline,
-                    site=site,
-                    keywords=keywords,
-                    strategy='basic'
-                )
-                
-                # 결과 메시지
-                if result['status'] == 'success':
-                    await query.message.chat.send_message(
-                        f"✅ **자동화 입찰 완료**\n\n"
-                        f"🔍 키워드: {', '.join(keywords)}\n"
-                        f"🔗 수집된 링크: {result['total_links']}개\n"
-                        f"📦 처리된 상품: {result['total_items']}개\n"
-                        f"✅ 성공한 입찰: {result['successful_bids']}개\n"
-                        f"⏱️ 실행 시간: {result['execution_time']:.2f}초",
-                        parse_mode='Markdown'
-                    )
-                else:
-                    await query.message.chat.send_message(
-                        f"❌ **자동화 입찰 실패**\n\n"
-                        f"오류: {result.get('error', '알 수 없는 오류')}",
-                        parse_mode='Markdown'
-                    )
-            
-        except Exception as e:
-            logger.error(f"자동화 입찰 실행 중 오류: {e}")
-            await query.message.chat.send_message(
-                self.config['messages']['error'].format(error=str(e))
-            )
-        finally:
-            self.is_running = False
-            self.current_task = None
-    
     async def _run_bidding(self, query, site: str, strategy: str):
         """입찰 실행 (비동기)"""
         chat_id = query.message.chat_id
+        message_id = query.message.message_id
         
         try:
             self.is_running = True
             self.current_task = {
                 'id': f"TG_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
-                'type': 'manual',
                 'site': site,
                 'strategy': strategy,
                 'start_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
@@ -435,7 +304,7 @@ class BiddingBot:
             }
             
             # 진행 상황 업데이트
-            stages = ['링크 읽기', '스크래핑', '가격 조정', '입찰 실행']
+            stages = ['링크 추출', '스크래핑', '가격 조정', '입찰 실행']
             
             for i, stage in enumerate(stages):
                 if not self.is_running:
@@ -504,7 +373,6 @@ class BiddingBot:
         # 핸들러 등록
         application.add_handler(CommandHandler("start", self.start_command))
         application.add_handler(CommandHandler("help", self.help_command))
-        application.add_handler(CommandHandler("auto", self.auto_command))  # 자동화 명령어 추가
         application.add_handler(CommandHandler("bid", self.bid_command))
         application.add_handler(CommandHandler("status", self.status_command))
         application.add_handler(CommandHandler("stop", self.stop_command))
@@ -512,7 +380,7 @@ class BiddingBot:
         application.add_handler(CallbackQueryHandler(self.button_callback))
         
         # 봇 시작
-        logger.info("텔레그램 봇 시작... (자동화 기능 활성화)")
+        logger.info("텔레그램 봇 시작...")
         application.run_polling()
 
 

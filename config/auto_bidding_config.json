@@ -1,0 +1,30 @@
+{
+  "search_keywords": {
+    "musinsa": ["나이키", "아디다스", "뉴발란스", "컨버스"],
+    "abcmart": ["운동화", "스니커즈", "러닝화"]
+  },
+  "extraction": {
+    "max_scrolls": 10,
+    "wait_time": 3,
+    "max_links": 30,
+    "timeout": 30
+  },
+  "pricing": {
+    "default_strategy": "basic",
+    "strategies": {
+      "basic": 0.95,
+      "standard": 0.90,
+      "premium": 0.85
+    }
+  },
+  "scraping": {
+    "delay": 2,
+    "timeout": 30,
+    "retry_count": 3
+  },
+  "selenium": {
+    "headless": false,
+    "window_size": "1920,1080",
+    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+  }
+}
