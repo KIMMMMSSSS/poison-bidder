@@ -168,24 +168,52 @@ class UnifiedBidding:
         return links
     
     def _scrape_items(self, site: str, links: List[str], process_mode: str) -> List[Dict[str, Any]]:
-        """상품 정보 스크래핑 (실제 구현 필요)"""
-        # TODO: 실제 스크래퍼 import 및 사용
-        logger.warning("스크래핑 기능은 아직 구현되지 않았습니다.")
+        """상품 정보 스크래핑 - JSON 파일에서 읽기"""
+        # 가장 최근의 스크래핑 결과 파일 찾기
+        json_pattern = f"{site}_products_*.json"
+        json_files = list(Path(".").glob(json_pattern))
         
-        # 임시 테스트 데이터
-        items = []
-        for i, link in enumerate(links):
-            items.append({
-                'brand': 'TEST_BRAND',
-                'code': f'TEST_{i+1:04d}',
-                'color': 'BLACK',
-                'size': '100',
-                'price': 50000 + (i * 10000),
-                'link': link,
-                'stock': True
-            })
+        if not json_files:
+            logger.warning(f"{site} 스크래핑 결과 파일을 찾을 수 없습니다.")
+            return []
         
-        return items
+        # 가장 최근 파일 선택
+        latest_file = max(json_files, key=lambda x: x.stat().st_mtime)
+        logger.info(f"스크래핑 결과 파일 읽기: {latest_file}")
+        
+        try:
+            with open(latest_file, 'r', encoding='utf-8') as f:
+                scraped_data = json.load(f)
+            
+            # 데이터 형식 변환 (unified format)
+            items = []
+            logger.info(f"원본 데이터 수: {len(scraped_data)}개 상품")
+            
+            for product in scraped_data:
+                # 각 사이즈별로 아이템 생성
+                for size_info in product.get('sizes_prices', []):
+                    if size_info['size'] != '품절':  # 품절 제외
+                        items.append({
+                            'brand': product['brand'],
+                            'code': product['product_code'],
+                            'product_code': product['product_code'],  # poison_bidder_wrapper_v2 호환
+                            'color': product.get('color', ''),
+                            'size': size_info['size'],
+                            'price': size_info['price'],
+                            'link': product['url'],
+                            'stock': True,
+                            'scraped_at': product.get('scraped_at', ''),
+                            'worker_id': product.get('worker_id', 0)
+                        })
+            
+            logger.info(f"스크래핑 데이터 로드 완료: {len(items)}개 아이템")
+            if items:
+                logger.debug(f"첫 번째 아이템 예시: {items[0]}")
+            return items
+            
+        except Exception as e:
+            logger.error(f"스크래핑 결과 파일 읽기 실패: {e}")
+            return []
     
     def _adjust_prices(self, items: List[Dict[str, Any]], strategy_id: str) -> List[Dict[str, Any]]:
         """가격 조정 적용"""
@@ -195,6 +223,7 @@ class UnifiedBidding:
             logger.warning(f"전략 '{strategy_id}'가 없거나 비활성화되어 있습니다.")
             return items
         
+        logger.info(f"가격 전략 '{strategy_id}' 적용 중...")
         adjusted_items = []
         adjustments = strategy.get('adjustments', {})
         
@@ -225,10 +254,28 @@ class UnifiedBidding:
     def _execute_bidding(self, site: str, items: List[Dict[str, Any]], exec_mode: str) -> List[Dict[str, Any]]:
         """포이즌 통합 입찰 실행"""
         logger.info("포이즌 통합 입찰 시스템을 사용한 입찰 실행")
+        logger.info(f"입찰 아이템 수: {len(items)}")
+        
+        # 데이터 검증 및 로깅
+        if items:
+            sample_item = items[0]
+            logger.info(f"샘플 아이템 구조: {list(sample_item.keys())}")
+            logger.info(f"샘플 아이템 데이터: {sample_item}")
+            
+            # 필수 필드 확인
+            required_fields = ['code', 'brand', 'size', 'price']
+            missing_fields = [field for field in required_fields if field not in sample_item]
+            if missing_fields:
+                logger.warning(f"누락된 필드: {missing_fields}")
         
         try:
             # AutoBiddingAdapter를 사용한 입찰 실행
-            adapter = AutoBiddingAdapter()
+            # Chrome 드라이버 경로 자동 탐색 사용
+            adapter = AutoBiddingAdapter(
+                driver_path=None,  # 자동 탐색
+                min_profit=0,      # 최소 수익 0
+                worker_count=5     # 워커 수
+            )
             result = adapter.run_with_poison(items)
             
             # 결과 형식 변환

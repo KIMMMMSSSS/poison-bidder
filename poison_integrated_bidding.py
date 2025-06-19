@@ -166,6 +166,16 @@ class AutoBiddingAdapter:
         """
         try:
             logger.info("포이즌 입찰 시작 (PoizonBidderWrapperV2 사용)")
+            logger.info(f"입력 아이템 수: {len(items)}")
+            
+            if items:
+                logger.debug(f"첫 번째 아이템 예시: {items[0]}")
+                # 필수 필드 검증
+                required_fields = ['code', 'brand', 'size', 'price']
+                sample_item = items[0]
+                missing_fields = [field for field in required_fields if field not in sample_item]
+                if missing_fields:
+                    logger.warning(f"누락된 필수 필드: {missing_fields}")
             
             # PoizonBidderWrapper 인스턴스 생성
             self.poison_bidder = PoizonBidderWrapperV2(

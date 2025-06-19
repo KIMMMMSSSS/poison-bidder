@@ -30,6 +30,34 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+def log_processor_worker(result_queue, result_list_queue):
+    """로그 처리 워커 프로세스 (모듈 레벨 함수)"""
+    results = []
+    fail_logs = []
+    
+    while True:
+        try:
+            msg_type, content = result_queue.get(timeout=1)
+            
+            if msg_type == "LOG":
+                logger.info(content)
+            elif msg_type == "FAIL_LOG":
+                fail_logs.append(content)
+            elif msg_type == "ERROR":
+                logger.error(content)
+            elif msg_type == "COMPLETE":
+                logger.info(f"[완료] {content}")
+            elif msg_type == "RESULT":
+                results.append(content)
+            elif msg_type == "TERMINATE":
+                # 종료 시 결과 반환
+                result_list_queue.put(('results', results))
+                result_list_queue.put(('fail_logs', fail_logs))
+                break
+        except:
+            continue
+
+
 class PoizonBidderWrapperV2:
     """포이즌 입찰 래퍼 V2 - 원본 파일의 실제 로직 활용"""
     
@@ -136,10 +164,17 @@ class PoizonBidderWrapperV2:
             입찰 결과 딕셔너리
         """
         start_time = datetime.now()
+        logger.info("=== 포이즌 입찰 시작 ===")
+        
+        # 입력 확인
+        logger.info(f"입력 파라미터 - bid_data_file: {bid_data_file is not None}, "
+                   f"bid_data_list: {bid_data_list is not None}, "
+                   f"unified_items: {unified_items is not None}")
         
         # 데이터 준비
         if unified_items:
             # 통합 시스템 데이터를 변환
+            logger.info(f"unified_items로부터 데이터 변환 시작: {len(unified_items)}개")
             raw_data = self.prepare_bid_data(unified_items)
         elif bid_data_file:
             # 파일에서 로드 (원본 함수 사용)
@@ -194,33 +229,11 @@ class PoizonBidderWrapperV2:
             
             logger.info(f"{self.worker_count}개의 워커 프로세스로 작업 시작")
             
-            # 결과 수집기
-            results = []
-            fail_logs = []
+            # 결과 수집을 위한 큐 추가
+            result_list_queue = manager.Queue()
             
-            # 로그 수집 프로세스
-            def log_processor(result_queue):
-                nonlocal results, fail_logs
-                while True:
-                    try:
-                        msg_type, content = result_queue.get(timeout=1)
-                        
-                        if msg_type == "LOG":
-                            logger.info(content)
-                        elif msg_type == "FAIL_LOG":
-                            fail_logs.append(content)
-                        elif msg_type == "ERROR":
-                            logger.error(content)
-                        elif msg_type == "COMPLETE":
-                            logger.info(f"[완료] {content}")
-                        elif msg_type == "RESULT":
-                            results.append(content)
-                        elif msg_type == "TERMINATE":
-                            break
-                    except:
-                        continue
-            
-            log_proc = Process(target=log_processor, args=(result_queue,))
+            # 로그 수집 프로세스 (모듈 레벨 함수 사용)
+            log_proc = Process(target=log_processor_worker, args=(result_queue, result_list_queue))
             log_proc.daemon = True
             log_proc.start()
             
@@ -248,6 +261,16 @@ class PoizonBidderWrapperV2:
             # 로그 수집 종료
             result_queue.put(("TERMINATE", None))
             log_proc.join()
+            
+            # 결과 수집
+            results = []
+            fail_logs = []
+            while not result_list_queue.empty():
+                data_type, data = result_list_queue.get()
+                if data_type == 'results':
+                    results = data
+                elif data_type == 'fail_logs':
+                    fail_logs = data
             
             # 실행 시간 계산
             execution_time = (datetime.now() - start_time).total_seconds()
