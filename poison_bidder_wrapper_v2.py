@@ -226,6 +226,16 @@ def worker_process_wrapper(worker_id, task_queue, result_queue, status_dict, log
             status_dict[worker_id] = {"status": "초기화 실패", "code": "", "progress": ""}
             error_msg = f"Worker {worker_id} Chrome 드라이버 초기화 실패: {type(e).__name__} - {str(e)}"
             result_queue.put(("ERROR", error_msg))
+            
+            # ChromeDriver 관련 오류인 경우 추가 안내
+            if "NoSuchDriverException" in type(e).__name__ or "chromedriver" in str(e).lower():
+                result_queue.put(("ERROR", "======= ChromeDriver 오류 해결 방법 ======="))
+                result_queue.put(("ERROR", "1. ChromeDriver가 설치되지 않았습니다."))
+                result_queue.put(("ERROR", "2. 다음 명령을 실행하여 설치하세요:"))
+                result_queue.put(("ERROR", "   python C:/poison_final/download_chromedriver.py"))
+                result_queue.put(("ERROR", "3. 또는 프로그램을 재시작하면 자동으로 설치됩니다."))
+                result_queue.put(("ERROR", "========================================="))
+            
             raise
         
         # 로그인 처리
@@ -1845,7 +1855,7 @@ class PoizonBidderWrapperV2:
         logger.info(f"PoizonBidderWrapperV2 초기화 - 최소수익: {min_profit}, 워커수: {worker_count}")
     
     def _find_chromedriver(self) -> str:
-        """Chrome 드라이버 자동 탐색"""
+        """Chrome 드라이버 자동 탐색 및 다운로드"""
         # 일반적인 위치들
         possible_paths = [
             "chromedriver.exe",
@@ -1858,8 +1868,40 @@ class PoizonBidderWrapperV2:
             if os.path.exists(path):
                 logger.info(f"Chrome 드라이버 발견: {path}")
                 return path
+        
+        # ChromeDriver를 찾지 못한 경우 자동 다운로드
+        logger.warning("ChromeDriver를 찾을 수 없습니다. 자동 다운로드를 시작합니다...")
+        
+        try:
+            import subprocess
+            download_script = Path("C:/poison_final/download_chromedriver.py")
+            
+            if download_script.exists():
+                logger.info("download_chromedriver.py 스크립트 실행 중...")
+                result = subprocess.run(
+                    [sys.executable, str(download_script)],
+                    capture_output=True,
+                    text=True,
+                    encoding='utf-8'
+                )
                 
-        # 못 찾으면 기본값
+                if result.returncode == 0:
+                    logger.info("ChromeDriver 다운로드 성공!")
+                    # 다운로드 후 다시 경로 확인
+                    chromedriver_path = "C:/poison_final/chromedriver.exe"
+                    if os.path.exists(chromedriver_path):
+                        logger.info(f"ChromeDriver 경로: {chromedriver_path}")
+                        return chromedriver_path
+                else:
+                    logger.error(f"ChromeDriver 다운로드 실패: {result.stderr}")
+            else:
+                logger.error(f"download_chromedriver.py 스크립트를 찾을 수 없습니다: {download_script}")
+                
+        except Exception as e:
+            logger.error(f"ChromeDriver 자동 다운로드 중 오류: {e}")
+        
+        # 여전히 못 찾으면 기본값 반환
+        logger.error("ChromeDriver를 찾을 수 없고 다운로드도 실패했습니다. 기본 경로 반환.")
         return "chromedriver.exe"
     
     def _load_original_module(self):
