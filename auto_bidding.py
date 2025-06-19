@@ -226,7 +226,7 @@ class AutoBidding:
             if site == "musinsa":
                 search_url = f"https://www.musinsa.com/search/goods?keyword={keyword}"
             else:
-                search_url = f"https://abcmart.a-rt.com/search?q={keyword}"
+                search_url = f"https://abcmart.a-rt.com/display/search-word/result?ntab&smartSearchCheck=false&perPage=30&sort=point&dfltChnnlMv=&searchPageGubun=product&track=W0010&searchWord={keyword}&page=1&channel=10001&chnnlNo=10001&tabGubun=total"
             
             # 페이지 로드
             self.driver.get(search_url)
@@ -248,10 +248,10 @@ class AutoBidding:
                                 links.append(f"https://www.musinsa.com/products/{product_id}")
                 else:
                     # ABC마트 링크 추출 로직
-                    elements = self.driver.find_elements(By.CSS_SELECTOR, "a[href*='/product/']")
+                    elements = self.driver.find_elements(By.CSS_SELECTOR, "a[href*='/product/detail/']")
                     for elem in elements:
                         href = elem.get_attribute('href')
-                        if href:
+                        if href and '/product/detail/' in href:
                             links.append(href)
                 
                 # 스크롤
