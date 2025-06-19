@@ -17,7 +17,7 @@ from pathlib import Path
 parent_dir = Path(__file__).parent.parent
 sys.path.insert(0, str(parent_dir))
 
-from poison_integrated_bidding import PoisonIntegratedBidding
+# from poison_integrated_bidding import PoisonIntegratedBidding
 from scraper_logger import ScraperLogger
 
 class TestPoisonBidding(unittest.TestCase):
@@ -30,16 +30,19 @@ class TestPoisonBidding(unittest.TestCase):
         cls.test_log_dir.mkdir(parents=True, exist_ok=True)
         
         # 로거 설정
-        cls.logger = ScraperLogger('TestPoisonBidding', log_dir=str(cls.test_log_dir))
-        cls.logger.info("=" * 60)
-        cls.logger.info("Poison 통합 테스트 시작")
-        cls.logger.info("=" * 60)
+        cls.logger = ScraperLogger(log_dir=str(cls.test_log_dir))
+        cls.logger.log("=" * 60)
+        cls.logger.log("Poison 통합 테스트 시작")
+        cls.logger.log("=" * 60)
         
         # 테스트용 Poison 객체 생성
-        cls.poison = PoisonIntegratedBidding(
-            profile_type='test',
-            max_workers=1,
-            headless=False  # 테스트 시 브라우저 표시
+        # PoisonIntegratedBidding는 인자를 받지 않음
+        # 대신 PoizonBidderWrapperV2를 사용하면 실제 입찰 테스트 가능
+        from poison_bidder_wrapper_v2 import PoizonBidderWrapperV2
+        cls.poison = PoizonBidderWrapperV2(
+            driver_path=None,
+            min_profit=0,
+            worker_count=1
         )
         
         # Remove 클릭 시간 측정을 위한 리스트
@@ -66,11 +69,11 @@ class TestPoisonBidding(unittest.TestCase):
     def tearDown(self):
         """각 테스트 케이스 종료 후 정리"""
         elapsed_time = time.time() - self.start_time
-        self.logger.info(f"테스트 소요 시간: {elapsed_time:.2f}초")
+        self.logger.log(f"테스트 소요 시간: {elapsed_time:.2f}초")
     
     def test_01_size_chart_parsing(self):
         """Size Chart 데이터 파싱 테스트"""
-        self.logger.info("\n=== Size Chart 파싱 테스트 시작 ===")
+        self.logger.log("\n=== Size Chart 파싱 테스트 시작 ===")
         
         test_html = """
         <table class="size-chart">
@@ -109,19 +112,19 @@ class TestPoisonBidding(unittest.TestCase):
                 'EU 43': {'US': '9.5', 'CM': '27.5'}
             }
             
-            self.logger.info(f"파싱된 Size Chart: {json.dumps(size_mapping, indent=2)}")
+            self.logger.log(f"파싱된 Size Chart: {json.dumps(size_mapping, indent=2)}")
             
             # CM 데이터 존재 확인
             self.assertTrue(any('CM' in data for data in size_mapping.values()))
-            self.logger.info("✓ CM 데이터 파싱 성공")
+            self.logger.log("[PASS] CM 데이터 파싱 성공")
             
         except Exception as e:
-            self.logger.error(f"Size Chart 파싱 실패: {str(e)}")
+            self.logger.log_error(f"Size Chart 파싱 실패: {str(e)}")
             self.fail(f"Size Chart 파싱 중 오류 발생: {str(e)}")
     
     def test_02_eu_to_cm_conversion(self):
         """EU 사이즈에서 CM 변환 로직 테스트"""
-        self.logger.info("\n=== EU → CM 변환 로직 테스트 시작 ===")
+        self.logger.log("\n=== EU -> CM 변환 로직 테스트 시작 ===")
         
         # 테스트 데이터
         test_cases = [
@@ -157,17 +160,17 @@ class TestPoisonBidding(unittest.TestCase):
                 if input_size in size_mapping and 'CM' in size_mapping[input_size]:
                     converted_cm = size_mapping[input_size]['CM']
                     self.assertEqual(converted_cm, expected_cm)
-                    self.logger.info(f"✓ {input_size} → CM {converted_cm} 변환 성공")
+                    self.logger.log(f"[PASS] {input_size} -> CM {converted_cm} 변환 성공")
                 else:
-                    self.logger.warning(f"{input_size}에 대한 CM 데이터 없음")
+                    self.logger.log(f"WARNING: {input_size}에 대한 CM 데이터 없음")
                     
             except Exception as e:
-                self.logger.error(f"EU→CM 변환 테스트 실패: {str(e)}")
-                self.fail(f"EU→CM 변환 중 오류: {str(e)}")
+                self.logger.log_error(f"EU->CM 변환 테스트 실패: {str(e)}")
+                self.fail(f"EU->CM 변환 중 오류: {str(e)}")
     
     def test_03_remove_button_speed(self):
         """Remove 버튼 클릭 속도 테스트"""
-        self.logger.info("\n=== Remove 버튼 클릭 속도 테스트 시작 ===")
+        self.logger.log("\n=== Remove 버튼 클릭 속도 테스트 시작 ===")
         
         # Remove 클릭 시간 측정 시뮬레이션
         num_tests = 5
@@ -183,21 +186,21 @@ class TestPoisonBidding(unittest.TestCase):
             click_time = time.time() - start
             self.__class__.remove_click_times.append(click_time)
             
-            self.logger.info(f"Remove 클릭 #{i+1}: {click_time:.3f}초")
+            self.logger.log(f"Remove 클릭 #{i+1}: {click_time:.3f}초")
             
         # 평균 시간 계산
         avg_time = sum(self.__class__.remove_click_times) / len(self.__class__.remove_click_times)
-        self.logger.info(f"\n평균 Remove 클릭 시간: {avg_time:.3f}초")
+        self.logger.log(f"\n평균 Remove 클릭 시간: {avg_time:.3f}초")
         
         # 목표 시간과 비교
         if avg_time <= 0.3:  # 0.3초 이하면 성공
-            self.logger.info("✓ Remove 클릭 속도 최적화 확인")
+            self.logger.log("[PASS] Remove 클릭 속도 최적화 확인")
         else:
-            self.logger.warning(f"⚠ Remove 클릭 속도가 목표보다 느림: {avg_time:.3f}초")
+            self.logger.log(f"WARNING: [WARN] Remove 클릭 속도가 목표보다 느림: {avg_time:.3f}초")
     
     def test_04_integration_test(self):
         """Poison 입찰 프로세스 통합 테스트"""
-        self.logger.info("\n=== 통합 테스트 시작 ===")
+        self.logger.log("\n=== 통합 테스트 시작 ===")
         
         # 테스트 결과 요약
         test_results = {
@@ -210,19 +213,19 @@ class TestPoisonBidding(unittest.TestCase):
         }
         
         # 테스트 결과 출력
-        self.logger.info("\n" + "=" * 50)
-        self.logger.info("통합 테스트 결과:")
-        self.logger.info("=" * 50)
+        self.logger.log("\n" + "=" * 50)
+        self.logger.log("통합 테스트 결과:")
+        self.logger.log("=" * 50)
         
         for test_name, status in test_results.items():
-            symbol = "✓" if status == 'PASS' else "✗"
-            self.logger.info(f"{symbol} {test_name}: {status}")
+            symbol = "[PASS]" if status == 'PASS' else "[FAIL]"
+            self.logger.log(f"{symbol} {test_name}: {status}")
         
         # 최종 확인
         if all(status == 'PASS' for status in test_results.values()):
-            self.logger.info("\n🎉 모든 테스트 통과! Poison 입찰 시스템 개선 완료")
+            self.logger.log("\n[SUCCESS] 모든 테스트 통과! Poison 입찰 시스템 개선 완료")
         else:
-            self.logger.warning("\n⚠ 일부 테스트 실패 - 추가 검토 필요")
+            self.logger.log("\nWARNING: [WARN] 일부 테스트 실패 - 추가 검토 필요")
 
 
 if __name__ == '__main__':
