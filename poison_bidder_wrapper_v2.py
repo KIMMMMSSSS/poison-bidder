@@ -906,6 +906,8 @@ class PoizonAutoBidderWorker:
                                     size_mapping[kr_size]['JP'] = cell_text
                                 elif header == 'UK':
                                     size_mapping[kr_size]['UK'] = cell_text
+                                elif header == 'Foot Length Fit' or header == 'CM':
+                                    size_mapping[kr_size]['CM'] = cell_text
                 
                 # 처음 3개 행만 샘플로 출력
                 if len(size_mapping) <= 3:
@@ -1296,15 +1298,27 @@ class PoizonAutoBidderWorker:
             size_chart = self.read_product_size_chart()
             if size_chart:
                 self.log_to_queue(f"[INFO] Size Chart 데이터 획득 ({len(size_chart)}개 사이즈)")
-                # EU 탭으로 시도
+                
+                # CM 탭 먼저 확인
                 try:
-                    eu_tab = self.driver.find_element(
+                    cm_tab = self.driver.find_element(
                         By.XPATH, 
-                        "//div[@class='tabItem___vEvcb' and text()='EU']"
+                        "//div[@class='tabItem___vEvcb' and text()='CM']"
                     )
-                    eu_tab.click()
-                    active_tab = 'EU'
-                    self.log_to_queue("[OK] EU 탭 사용 결정")
+                    cm_tab.click()
+                    active_tab = 'CM'
+                    self.log_to_queue("[OK] CM 탭 사용 결정")
+                except:
+                    # CM 탭이 없으면 EU 탭으로 시도
+                    self.log_to_queue("[INFO] CM 탭 없음 - EU 탭으로 시도")
+                    try:
+                        eu_tab = self.driver.find_element(
+                            By.XPATH, 
+                            "//div[@class='tabItem___vEvcb' and text()='EU']"
+                        )
+                        eu_tab.click()
+                        active_tab = 'EU'
+                        self.log_to_queue("[OK] EU 탭 사용 결정 - Size Chart 기반 CM 변환 예정")
                 except:
                     # 다른 탭 찾기
                     tabs = self.driver.find_elements(By.XPATH, "//div[@class='tabItem___vEvcb']")
@@ -1377,14 +1391,30 @@ class PoizonAutoBidderWorker:
                 
                 # 먼저 원본 사이즈로 시도
                 target_size = target_size_original
-            elif 'size_chart' in locals() and size_chart and size in size_chart and active_tab in size_chart[size]:
-                # Size Chart가 있을 때만 사용
-                target_size = size_chart[size][active_tab]
-                if target_size and target_size != '-':
-                    self.log_to_queue(f"[DEBUG] Size Chart 기반 사이즈: {size} → {active_tab}: {target_size}")
+            elif 'size_chart' in locals() and size_chart and size in size_chart:
+                # Size Chart가 있을 때 변환 처리
+                if active_tab == 'EU' and 'CM' in size_chart[size]:
+                    # EU 탭에서 CM 변환이 필요한 경우
+                    cm_value = size_chart[size].get('CM', '')
+                    if cm_value and cm_value != '-':
+                        self.log_to_queue(f"[INFO] EU→CM 변환: {size} → EU {size_chart[size].get('EU', size)} → CM {cm_value}")
+                        # EU 사이즈를 사용하되, CM 값도 참고
+                        target_size = size_chart[size].get('EU', size)
+                        # CM 정보를 로그에 기록
+                        self.log_to_queue(f"[DEBUG] 참고: 해당 사이즈의 CM 값은 {cm_value}입니다")
+                    else:
+                        target_size = size_chart[size].get(active_tab, size)
+                        self.log_to_queue(f"[DEBUG] Size Chart 기반 사이즈: {size} → {active_tab}: {target_size}")
+                elif active_tab in size_chart[size]:
+                    target_size = size_chart[size][active_tab]
+                    if target_size and target_size != '-':
+                        self.log_to_queue(f"[DEBUG] Size Chart 기반 사이즈: {size} → {active_tab}: {target_size}")
+                    else:
+                        target_size = size
+                        self.log_to_queue(f"[DEBUG] Size Chart에 정보 없음 - 원본 사용: {target_size}")
                 else:
                     target_size = size
-                    self.log_to_queue(f"[DEBUG] Size Chart에 정보 없음 - 원본 사용: {target_size}")
+                    self.log_to_queue(f"[DEBUG] Size Chart에 {active_tab} 정보 없음 - 원본 사용: {target_size}")
             else:
                 target_size = size
             
