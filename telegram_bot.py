@@ -9,9 +9,14 @@ import sys
 import json
 import logging
 import asyncio
+import queue
+import threading
 from pathlib import Path
 from datetime import datetime
 from typing import Dict, Any, Optional
+
+# 상태 추적을 위한 상수 import
+import status_constants
 
 # python-telegram-bot 라이브러리
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -360,53 +365,75 @@ class BiddingBot:
                 parse_mode='Markdown'
             )
             
-            # 진행 상황 업데이트
-            stages = [
-                ('로그인 확인', '🔐 로그인 상태 확인 중...', 5),
-                ('키워드 검색', '🔍 검색 페이지 접속 중...', 10),
-                ('링크 추출', '🔗 상품 링크 수집 중...', 20),
-                ('정보 수집', '📦 상품 정보 스크래핑 중...', 40),
-                ('가격 계산', '💰 최적 가격 계산 중...', 10),
-                ('입찰 실행', '🎯 입찰 진행 중...', 15)
-            ]
+            # 큐 생성 (threading과 asyncio 간 통신)
+            status_queue = queue.Queue()
+            last_progress = 0
             
-            total_weight = sum(s[2] for s in stages)
-            current_progress = 0
+            # 콜백 함수 정의
+            def status_callback(stage: str, progress: int, message: str, details: dict = None):
+                """상태 업데이트 콜백"""
+                nonlocal last_progress
+                
+                # 진행률이 일정 이상 변경되었을 때만 업데이트
+                if progress - last_progress >= status_constants.PROGRESS_UPDATE_THRESHOLD or stage == status_constants.STAGE_ERROR:
+                    status_queue.put({
+                        'stage': stage,
+                        'progress': progress,
+                        'message': message,
+                        'details': details or {}
+                    })
+                    last_progress = progress
             
-            for i, (stage, description, weight) in enumerate(stages):
-                if not self.is_running:
-                    break
-                
-                self.current_task['stage'] = stage
-                current_progress += weight
-                
-                # 진행률 계산
-                percentage = int((current_progress / total_weight) * 100)
-                
-                # 프로그레스 바 생성
-                filled = int(percentage / 10)
-                progress_bar = "█" * filled + "░" * (10 - filled)
-                
-                # 메시지 업데이트
-                await query.message.chat.send_message(
-                    f"⚙️ **진행 상황**\n\n"
-                    f"[{progress_bar}] {percentage}%\n\n"
-                    f"🔄 현재 단계: {stage}\n"
-                    f"📝 {description}",
-                    parse_mode='Markdown'
-                )
-                
-                # 실제 작업 시뮬레이션 (나중에 실제 작업으로 교체)
-                await asyncio.sleep(weight / 5)  # 가중치에 따른 대기 시간
+            # 큐 모니터링 태스크
+            async def monitor_queue():
+                """큐를 모니터링하고 텔레그램 메시지 전송"""
+                while self.is_running:
+                    try:
+                        # 큐에서 상태 가져오기 (0.1초 타임아웃)
+                        status = status_queue.get(timeout=0.1)
+                        
+                        # 현재 작업 상태 업데이트
+                        self.current_task['stage'] = status['stage']
+                        self.current_task['progress'] = status['progress']
+                        
+                        # 메시지 포맷팅
+                        formatted_msg = status_constants.format_status_message(
+                            status['stage'],
+                            status['progress'],
+                            status['message'],
+                            status['details']
+                        )
+                        
+                        # 텔레그램 메시지 전송
+                        await query.message.chat.send_message(
+                            formatted_msg,
+                            parse_mode='Markdown'
+                        )
+                        
+                        # API 제한 고려하여 대기
+                        await asyncio.sleep(status_constants.TELEGRAM_MESSAGE_MIN_INTERVAL)
+                        
+                    except queue.Empty:
+                        # 큐가 비어있으면 짧게 대기
+                        await asyncio.sleep(0.1)
+                    except Exception as e:
+                        logger.error(f"큐 모니터링 중 오류: {e}")
             
-            # 실제 자동 입찰 실행
-            if self.is_running:
+            # 큐 모니터링 시작
+            monitor_task = asyncio.create_task(monitor_queue())
+            
+            # 실제 자동 입찰 실행 (별도 스레드에서)
+            try:
                 result = await asyncio.to_thread(
                     self.auto_bidder.run_auto_pipeline,
                     site=site,
                     keywords=keywords,
-                    strategy='basic'
+                    strategy='basic',
+                    status_callback=status_callback
                 )
+                
+                # 작업 완료 후 잠시 대기 (마지막 메시지 처리)
+                await asyncio.sleep(0.5)
                 
                 # 결과 메시지
                 if result['status'] == 'success':
@@ -459,6 +486,15 @@ class BiddingBot:
                         error_msg,
                         parse_mode='Markdown'
                     )
+                    
+            finally:
+                # 큐 모니터링 종료
+                self.is_running = False
+                monitor_task.cancel()
+                try:
+                    await monitor_task
+                except asyncio.CancelledError:
+                    pass
             
         except Exception as e:
             logger.error(f"자동화 입찰 실행 중 오류: {e}")
