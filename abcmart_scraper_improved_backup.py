@@ -928,8 +928,8 @@ class AbcmartMultiprocessScraper:
             
             # 로깅
             logger = ScraperLogger(log_dir="C:/poison_final/logs")
-            logger.log_file = logger.log_file.replace("musinsa", "abcmart")
-            logger.summary_file = logger.summary_file.replace("musinsa", "abcmart")
+            logger.log_file = Path(str(logger.log_file).replace("musinsa", "abcmart"))
+            logger.summary_file = Path(str(logger.summary_file).replace("musinsa", "abcmart"))
             
             # 로깅 통계 업데이트
             logger.stats['total_urls'] = len(urls)

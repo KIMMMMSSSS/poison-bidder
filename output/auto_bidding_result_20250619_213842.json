@@ -1,0 +1,490 @@
+{
+  "links": [
+    "https://abcmart.a-rt.com/product?prdtNo=1010090621",
+    "https://abcmart.a-rt.com/product?prdtNo=1010095881",
+    "https://abcmart.a-rt.com/product?prdtNo=1010111713",
+    "https://abcmart.a-rt.com/product?prdtNo=1010093363",
+    "https://abcmart.a-rt.com/product?prdtNo=1010105807",
+    "https://abcmart.a-rt.com/product?prdtNo=1010107753",
+    "https://abcmart.a-rt.com/product?prdtNo=1010112808",
+    "https://abcmart.a-rt.com/product?prdtNo=1010112838",
+    "https://abcmart.a-rt.com/product?prdtNo=1010107704",
+    "https://abcmart.a-rt.com/product?prdtNo=1010105783",
+    "https://abcmart.a-rt.com/product?prdtNo=1010097227",
+    "https://abcmart.a-rt.com/product?prdtNo=1010099809",
+    "https://abcmart.a-rt.com/product?prdtNo=1010111775",
+    "https://abcmart.a-rt.com/product?prdtNo=1010090627",
+    "https://abcmart.a-rt.com/product?prdtNo=1010107752",
+    "https://abcmart.a-rt.com/product?prdtNo=1010107723",
+    "https://abcmart.a-rt.com/product?prdtNo=1010111779",
+    "https://abcmart.a-rt.com/product?prdtNo=1010075405",
+    "https://abcmart.a-rt.com/product?prdtNo=1010105838",
+    "https://abcmart.a-rt.com/product?prdtNo=1010112891",
+    "https://abcmart.a-rt.com/product?prdtNo=1010098678",
+    "https://abcmart.a-rt.com/product?prdtNo=1010103957",
+    "https://abcmart.a-rt.com/product?prdtNo=1010107754",
+    "https://abcmart.a-rt.com/product?prdtNo=1010090623",
+    "https://abcmart.a-rt.com/product?prdtNo=1010111706",
+    "https://abcmart.a-rt.com/product?prdtNo=1010111782",
+    "https://abcmart.a-rt.com/product?prdtNo=1010090650",
+    "https://abcmart.a-rt.com/product?prdtNo=1010111739",
+    "https://abcmart.a-rt.com/product?prdtNo=1010098680",
+    "https://abcmart.a-rt.com/product?prdtNo=1010107681"
+  ],
+  "items": [
+    {
+      "link": "https://abcmart.a-rt.com/product?prdtNo=1010090621"
+    },
+    {
+      "link": "https://abcmart.a-rt.com/product?prdtNo=1010095881"
+    },
+    {
+      "link": "https://abcmart.a-rt.com/product?prdtNo=1010111713"
+    },
+    {
+      "link": "https://abcmart.a-rt.com/product?prdtNo=1010093363"
+    },
+    {
+      "link": "https://abcmart.a-rt.com/product?prdtNo=1010105807"
+    },
+    {
+      "link": "https://abcmart.a-rt.com/product?prdtNo=1010107753"
+    },
+    {
+      "link": "https://abcmart.a-rt.com/product?prdtNo=1010112808"
+    },
+    {
+      "link": "https://abcmart.a-rt.com/product?prdtNo=1010112838"
+    },
+    {
+      "link": "https://abcmart.a-rt.com/product?prdtNo=1010107704"
+    },
+    {
+      "link": "https://abcmart.a-rt.com/product?prdtNo=1010105783"
+    },
+    {
+      "link": "https://abcmart.a-rt.com/product?prdtNo=1010097227"
+    },
+    {
+      "link": "https://abcmart.a-rt.com/product?prdtNo=1010099809"
+    },
+    {
+      "link": "https://abcmart.a-rt.com/product?prdtNo=1010111775"
+    },
+    {
+      "link": "https://abcmart.a-rt.com/product?prdtNo=1010090627"
+    },
+    {
+      "link": "https://abcmart.a-rt.com/product?prdtNo=1010107752"
+    },
+    {
+      "link": "https://abcmart.a-rt.com/product?prdtNo=1010107723"
+    },
+    {
+      "link": "https://abcmart.a-rt.com/product?prdtNo=1010111779"
+    },
+    {
+      "link": "https://abcmart.a-rt.com/product?prdtNo=1010075405"
+    },
+    {
+      "link": "https://abcmart.a-rt.com/product?prdtNo=1010105838"
+    },
+    {
+      "link": "https://abcmart.a-rt.com/product?prdtNo=1010112891"
+    },
+    {
+      "link": "https://abcmart.a-rt.com/product?prdtNo=1010098678"
+    },
+    {
+      "link": "https://abcmart.a-rt.com/product?prdtNo=1010103957"
+    },
+    {
+      "link": "https://abcmart.a-rt.com/product?prdtNo=1010107754"
+    },
+    {
+      "link": "https://abcmart.a-rt.com/product?prdtNo=1010090623"
+    },
+    {
+      "link": "https://abcmart.a-rt.com/product?prdtNo=1010111706"
+    },
+    {
+      "link": "https://abcmart.a-rt.com/product?prdtNo=1010111782"
+    },
+    {
+      "link": "https://abcmart.a-rt.com/product?prdtNo=1010090650"
+    },
+    {
+      "link": "https://abcmart.a-rt.com/product?prdtNo=1010111739"
+    },
+    {
+      "link": "https://abcmart.a-rt.com/product?prdtNo=1010098680"
+    },
+    {
+      "link": "https://abcmart.a-rt.com/product?prdtNo=1010107681"
+    }
+  ],
+  "adjusted_items": [
+    {
+      "link": "https://abcmart.a-rt.com/product?prdtNo=1010090621",
+      "adjusted_price": 0,
+      "discount_amount": 0
+    },
+    {
+      "link": "https://abcmart.a-rt.com/product?prdtNo=1010095881",
+      "adjusted_price": 0,
+      "discount_amount": 0
+    },
+    {
+      "link": "https://abcmart.a-rt.com/product?prdtNo=1010111713",
+      "adjusted_price": 0,
+      "discount_amount": 0
+    },
+    {
+      "link": "https://abcmart.a-rt.com/product?prdtNo=1010093363",
+      "adjusted_price": 0,
+      "discount_amount": 0
+    },
+    {
+      "link": "https://abcmart.a-rt.com/product?prdtNo=1010105807",
+      "adjusted_price": 0,
+      "discount_amount": 0
+    },
+    {
+      "link": "https://abcmart.a-rt.com/product?prdtNo=1010107753",
+      "adjusted_price": 0,
+      "discount_amount": 0
+    },
+    {
+      "link": "https://abcmart.a-rt.com/product?prdtNo=1010112808",
+      "adjusted_price": 0,
+      "discount_amount": 0
+    },
+    {
+      "link": "https://abcmart.a-rt.com/product?prdtNo=1010112838",
+      "adjusted_price": 0,
+      "discount_amount": 0
+    },
+    {
+      "link": "https://abcmart.a-rt.com/product?prdtNo=1010107704",
+      "adjusted_price": 0,
+      "discount_amount": 0
+    },
+    {
+      "link": "https://abcmart.a-rt.com/product?prdtNo=1010105783",
+      "adjusted_price": 0,
+      "discount_amount": 0
+    },
+    {
+      "link": "https://abcmart.a-rt.com/product?prdtNo=1010097227",
+      "adjusted_price": 0,
+      "discount_amount": 0
+    },
+    {
+      "link": "https://abcmart.a-rt.com/product?prdtNo=1010099809",
+      "adjusted_price": 0,
+      "discount_amount": 0
+    },
+    {
+      "link": "https://abcmart.a-rt.com/product?prdtNo=1010111775",
+      "adjusted_price": 0,
+      "discount_amount": 0
+    },
+    {
+      "link": "https://abcmart.a-rt.com/product?prdtNo=1010090627",
+      "adjusted_price": 0,
+      "discount_amount": 0
+    },
+    {
+      "link": "https://abcmart.a-rt.com/product?prdtNo=1010107752",
+      "adjusted_price": 0,
+      "discount_amount": 0
+    },
+    {
+      "link": "https://abcmart.a-rt.com/product?prdtNo=1010107723",
+      "adjusted_price": 0,
+      "discount_amount": 0
+    },
+    {
+      "link": "https://abcmart.a-rt.com/product?prdtNo=1010111779",
+      "adjusted_price": 0,
+      "discount_amount": 0
+    },
+    {
+      "link": "https://abcmart.a-rt.com/product?prdtNo=1010075405",
+      "adjusted_price": 0,
+      "discount_amount": 0
+    },
+    {
+      "link": "https://abcmart.a-rt.com/product?prdtNo=1010105838",
+      "adjusted_price": 0,
+      "discount_amount": 0
+    },
+    {
+      "link": "https://abcmart.a-rt.com/product?prdtNo=1010112891",
+      "adjusted_price": 0,
+      "discount_amount": 0
+    },
+    {
+      "link": "https://abcmart.a-rt.com/product?prdtNo=1010098678",
+      "adjusted_price": 0,
+      "discount_amount": 0
+    },
+    {
+      "link": "https://abcmart.a-rt.com/product?prdtNo=1010103957",
+      "adjusted_price": 0,
+      "discount_amount": 0
+    },
+    {
+      "link": "https://abcmart.a-rt.com/product?prdtNo=1010107754",
+      "adjusted_price": 0,
+      "discount_amount": 0
+    },
+    {
+      "link": "https://abcmart.a-rt.com/product?prdtNo=1010090623",
+      "adjusted_price": 0,
+      "discount_amount": 0
+    },
+    {
+      "link": "https://abcmart.a-rt.com/product?prdtNo=1010111706",
+      "adjusted_price": 0,
+      "discount_amount": 0
+    },
+    {
+      "link": "https://abcmart.a-rt.com/product?prdtNo=1010111782",
+      "adjusted_price": 0,
+      "discount_amount": 0
+    },
+    {
+      "link": "https://abcmart.a-rt.com/product?prdtNo=1010090650",
+      "adjusted_price": 0,
+      "discount_amount": 0
+    },
+    {
+      "link": "https://abcmart.a-rt.com/product?prdtNo=1010111739",
+      "adjusted_price": 0,
+      "discount_amount": 0
+    },
+    {
+      "link": "https://abcmart.a-rt.com/product?prdtNo=1010098680",
+      "adjusted_price": 0,
+      "discount_amount": 0
+    },
+    {
+      "link": "https://abcmart.a-rt.com/product?prdtNo=1010107681",
+      "adjusted_price": 0,
+      "discount_amount": 0
+    }
+  ],
+  "bid_results": [
+    {
+      "item": "https://abcmart.a-rt.com/product?prdtNo=1010090621",
+      "price": 0,
+      "success": false,
+      "message": "포이즌 로그인 실패",
+      "timestamp": "2025-06-19T21:38:42.570810"
+    },
+    {
+      "item": "https://abcmart.a-rt.com/product?prdtNo=1010095881",
+      "price": 0,
+      "success": false,
+      "message": "포이즌 로그인 실패",
+      "timestamp": "2025-06-19T21:38:42.570810"
+    },
+    {
+      "item": "https://abcmart.a-rt.com/product?prdtNo=1010111713",
+      "price": 0,
+      "success": false,
+      "message": "포이즌 로그인 실패",
+      "timestamp": "2025-06-19T21:38:42.570810"
+    },
+    {
+      "item": "https://abcmart.a-rt.com/product?prdtNo=1010093363",
+      "price": 0,
+      "success": false,
+      "message": "포이즌 로그인 실패",
+      "timestamp": "2025-06-19T21:38:42.570810"
+    },
+    {
+      "item": "https://abcmart.a-rt.com/product?prdtNo=1010105807",
+      "price": 0,
+      "success": false,
+      "message": "포이즌 로그인 실패",
+      "timestamp": "2025-06-19T21:38:42.570810"
+    },
+    {
+      "item": "https://abcmart.a-rt.com/product?prdtNo=1010107753",
+      "price": 0,
+      "success": false,
+      "message": "포이즌 로그인 실패",
+      "timestamp": "2025-06-19T21:38:42.570810"
+    },
+    {
+      "item": "https://abcmart.a-rt.com/product?prdtNo=1010112808",
+      "price": 0,
+      "success": false,
+      "message": "포이즌 로그인 실패",
+      "timestamp": "2025-06-19T21:38:42.570810"
+    },
+    {
+      "item": "https://abcmart.a-rt.com/product?prdtNo=1010112838",
+      "price": 0,
+      "success": false,
+      "message": "포이즌 로그인 실패",
+      "timestamp": "2025-06-19T21:38:42.570810"
+    },
+    {
+      "item": "https://abcmart.a-rt.com/product?prdtNo=1010107704",
+      "price": 0,
+      "success": false,
+      "message": "포이즌 로그인 실패",
+      "timestamp": "2025-06-19T21:38:42.570810"
+    },
+    {
+      "item": "https://abcmart.a-rt.com/product?prdtNo=1010105783",
+      "price": 0,
+      "success": false,
+      "message": "포이즌 로그인 실패",
+      "timestamp": "2025-06-19T21:38:42.570810"
+    },
+    {
+      "item": "https://abcmart.a-rt.com/product?prdtNo=1010097227",
+      "price": 0,
+      "success": false,
+      "message": "포이즌 로그인 실패",
+      "timestamp": "2025-06-19T21:38:42.570810"
+    },
+    {
+      "item": "https://abcmart.a-rt.com/product?prdtNo=1010099809",
+      "price": 0,
+      "success": false,
+      "message": "포이즌 로그인 실패",
+      "timestamp": "2025-06-19T21:38:42.570810"
+    },
+    {
+      "item": "https://abcmart.a-rt.com/product?prdtNo=1010111775",
+      "price": 0,
+      "success": false,
+      "message": "포이즌 로그인 실패",
+      "timestamp": "2025-06-19T21:38:42.570810"
+    },
+    {
+      "item": "https://abcmart.a-rt.com/product?prdtNo=1010090627",
+      "price": 0,
+      "success": false,
+      "message": "포이즌 로그인 실패",
+      "timestamp": "2025-06-19T21:38:42.570810"
+    },
+    {
+      "item": "https://abcmart.a-rt.com/product?prdtNo=1010107752",
+      "price": 0,
+      "success": false,
+      "message": "포이즌 로그인 실패",
+      "timestamp": "2025-06-19T21:38:42.570810"
+    },
+    {
+      "item": "https://abcmart.a-rt.com/product?prdtNo=1010107723",
+      "price": 0,
+      "success": false,
+      "message": "포이즌 로그인 실패",
+      "timestamp": "2025-06-19T21:38:42.570810"
+    },
+    {
+      "item": "https://abcmart.a-rt.com/product?prdtNo=1010111779",
+      "price": 0,
+      "success": false,
+      "message": "포이즌 로그인 실패",
+      "timestamp": "2025-06-19T21:38:42.570810"
+    },
+    {
+      "item": "https://abcmart.a-rt.com/product?prdtNo=1010075405",
+      "price": 0,
+      "success": false,
+      "message": "포이즌 로그인 실패",
+      "timestamp": "2025-06-19T21:38:42.570810"
+    },
+    {
+      "item": "https://abcmart.a-rt.com/product?prdtNo=1010105838",
+      "price": 0,
+      "success": false,
+      "message": "포이즌 로그인 실패",
+      "timestamp": "2025-06-19T21:38:42.570810"
+    },
+    {
+      "item": "https://abcmart.a-rt.com/product?prdtNo=1010112891",
+      "price": 0,
+      "success": false,
+      "message": "포이즌 로그인 실패",
+      "timestamp": "2025-06-19T21:38:42.570810"
+    },
+    {
+      "item": "https://abcmart.a-rt.com/product?prdtNo=1010098678",
+      "price": 0,
+      "success": false,
+      "message": "포이즌 로그인 실패",
+      "timestamp": "2025-06-19T21:38:42.570810"
+    },
+    {
+      "item": "https://abcmart.a-rt.com/product?prdtNo=1010103957",
+      "price": 0,
+      "success": false,
+      "message": "포이즌 로그인 실패",
+      "timestamp": "2025-06-19T21:38:42.570810"
+    },
+    {
+      "item": "https://abcmart.a-rt.com/product?prdtNo=1010107754",
+      "price": 0,
+      "success": false,
+      "message": "포이즌 로그인 실패",
+      "timestamp": "2025-06-19T21:38:42.570810"
+    },
+    {
+      "item": "https://abcmart.a-rt.com/product?prdtNo=1010090623",
+      "price": 0,
+      "success": false,
+      "message": "포이즌 로그인 실패",
+      "timestamp": "2025-06-19T21:38:42.570810"
+    },
+    {
+      "item": "https://abcmart.a-rt.com/product?prdtNo=1010111706",
+      "price": 0,
+      "success": false,
+      "message": "포이즌 로그인 실패",
+      "timestamp": "2025-06-19T21:38:42.570810"
+    },
+    {
+      "item": "https://abcmart.a-rt.com/product?prdtNo=1010111782",
+      "price": 0,
+      "success": false,
+      "message": "포이즌 로그인 실패",
+      "timestamp": "2025-06-19T21:38:42.570810"
+    },
+    {
+      "item": "https://abcmart.a-rt.com/product?prdtNo=1010090650",
+      "price": 0,
+      "success": false,
+      "message": "포이즌 로그인 실패",
+      "timestamp": "2025-06-19T21:38:42.570810"
+    },
+    {
+      "item": "https://abcmart.a-rt.com/product?prdtNo=1010111739",
+      "price": 0,
+      "success": false,
+      "message": "포이즌 로그인 실패",
+      "timestamp": "2025-06-19T21:38:42.570810"
+    },
+    {
+      "item": "https://abcmart.a-rt.com/product?prdtNo=1010098680",
+      "price": 0,
+      "success": false,
+      "message": "포이즌 로그인 실패",
+      "timestamp": "2025-06-19T21:38:42.570810"
+    },
+    {
+      "item": "https://abcmart.a-rt.com/product?prdtNo=1010107681",
+      "price": 0,
+      "success": false,
+      "message": "포이즌 로그인 실패",
+      "timestamp": "2025-06-19T21:38:42.570810"
+    }
+  ]
+}

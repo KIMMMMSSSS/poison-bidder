@@ -220,6 +220,7 @@ class AutoBiddingAdapter:
         포이즌 입찰 결과를 통합 시스템 형식으로 변환
         """
         converted_results = []
+        logger.debug(f"결과 변환 시작 - items: {len(items)}, bid_results: {len(bid_results)}")
         
         # 코드별로 결과 매핑
         code_results = {}
@@ -227,6 +228,8 @@ class AutoBiddingAdapter:
             code = result.get('code')
             if code:
                 code_results[code] = result
+        
+        logger.debug(f"코드별 결과 매핑 완료: {len(code_results)}개")
         
         # 아이템별 결과 생성
         for item in items:

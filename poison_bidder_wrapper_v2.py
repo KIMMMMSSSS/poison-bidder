@@ -128,6 +128,10 @@ class PoizonBidderWrapperV2:
         """
         bid_data = []
         
+        logger.debug(f"데이터 변환 시작: {len(items)}개 아이템")
+        if items and logger.isEnabledFor(logging.DEBUG):
+            logger.debug(f"첫 번째 아이템 샘플: {json.dumps(items[0], ensure_ascii=False)}")
+        
         for idx, item in enumerate(items, 1):
             # 데이터 추출
             brand = item.get('brand', '')
@@ -147,6 +151,8 @@ class PoizonBidderWrapperV2:
             ))
             
         logger.info(f"데이터 변환 완료: {len(bid_data)}개 아이템")
+        if bid_data and logger.isEnabledFor(logging.DEBUG):
+            logger.debug(f"변환된 첫 번째 튜플: {bid_data[0]}")
         return bid_data
     
     def run_bidding(self, bid_data_file: Optional[str] = None, 

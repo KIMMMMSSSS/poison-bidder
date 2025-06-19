@@ -36,17 +36,24 @@ logger = logging.getLogger(__name__)
 class UnifiedBidding:
     """통합 입찰 실행 클래스"""
     
-    def __init__(self, config_path: str = "config/pricing_strategies.json"):
+    def __init__(self, config_path: str = "config/pricing_strategies.json", debug: bool = False):
         """
         초기화
         
         Args:
             config_path: 가격 전략 설정 파일 경로
+            debug: 디버그 모드 활성화 여부
         """
         self.config_path = Path(config_path)
         self.config = self._load_config()
         self.db_path = Path("db/bidding.db")
         self.results = {}
+        self.debug = debug
+        
+        # 디버그 모드일 때 로그 레벨 변경
+        if self.debug:
+            logging.getLogger().setLevel(logging.DEBUG)
+            logger.debug("디버그 모드 활성화")
         
         logger.info("UnifiedBidding 초기화 완료")
         
@@ -84,31 +91,45 @@ class UnifiedBidding:
         logger.info(f"파이프라인 시작: site={site}, strategy={strategy_id}")
         
         try:
+            # 성능 측정을 위한 단계별 시간 기록
+            step_times = {}
+            
             # 1. 링크 추출
+            step_start = datetime.now()
             logger.info("[1/4] 링크 추출 시작...")
             links = self._extract_links(site)
             self.results['links'] = links
-            logger.info(f"추출된 링크 수: {len(links)}")
+            step_times['link_extraction'] = (datetime.now() - step_start).total_seconds()
+            logger.info(f"추출된 링크 수: {len(links)} (소요시간: {step_times['link_extraction']:.2f}초)")
             
             # 2. 상품 정보 스크래핑
+            step_start = datetime.now()
             logger.info("[2/4] 스크래핑 시작...")
             items = self._scrape_items(site, links, process_mode)
             self.results['items'] = items
-            logger.info(f"스크래핑된 상품 수: {len(items)}")
+            step_times['scraping'] = (datetime.now() - step_start).total_seconds()
+            logger.info(f"스크래핑된 상품 수: {len(items)} (소요시간: {step_times['scraping']:.2f}초)")
             
             # 3. 가격 조정
+            step_start = datetime.now()
             logger.info("[3/4] 가격 조정 시작...")
             adjusted_items = self._adjust_prices(items, strategy_id)
             self.results['adjusted_items'] = adjusted_items
-            logger.info(f"가격 조정 완료: {len(adjusted_items)}개")
+            step_times['price_adjustment'] = (datetime.now() - step_start).total_seconds()
+            logger.info(f"가격 조정 완료: {len(adjusted_items)}개 (소요시간: {step_times['price_adjustment']:.2f}초)")
             
             # 4. 입찰 실행
+            step_start = datetime.now()
             logger.info("[4/4] 입찰 실행 시작...")
             bid_results = self._execute_bidding(site, adjusted_items, exec_mode)
             self.results['bid_results'] = bid_results
+            step_times['bidding'] = (datetime.now() - step_start).total_seconds()
+            logger.info(f"입찰 실행 완료 (소요시간: {step_times['bidding']:.2f}초)")
             
             # 결과 저장
+            step_start = datetime.now()
             self._save_results()
+            step_times['saving'] = (datetime.now() - step_start).total_seconds()
             
             # 실행 시간 계산
             execution_time = (datetime.now() - start_time).total_seconds()
@@ -123,10 +144,12 @@ class UnifiedBidding:
                 'successful_bids': sum(1 for r in bid_results if r.get('success', False)),
                 'failed_bids': sum(1 for r in bid_results if not r.get('success', False)),
                 'execution_time': execution_time,
+                'step_times': step_times,
                 'timestamp': datetime.now().isoformat()
             }
             
             logger.info(f"파이프라인 완료: {execution_time:.2f}초")
+            logger.info(f"단계별 소요시간: {json.dumps(step_times, indent=2)}")
             return final_result
             
         except Exception as e:
@@ -388,11 +411,13 @@ def main():
                         help='실행 모드')
     parser.add_argument('--process', choices=['sequential', 'parallel'], default='sequential',
                         help='처리 방식')
+    parser.add_argument('--debug', action='store_true',
+                        help='디버그 모드 활성화')
     
     args = parser.parse_args()
     
     # 실행
-    bidder = UnifiedBidding()
+    bidder = UnifiedBidding(debug=args.debug)
     result = bidder.run_pipeline(
         site=args.site,
         strategy_id=args.strategy,
