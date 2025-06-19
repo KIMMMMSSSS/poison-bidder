@@ -248,11 +248,25 @@ class AutoBidding:
                                 links.append(f"https://www.musinsa.com/products/{product_id}")
                 else:
                     # ABC마트 링크 추출 로직
-                    elements = self.driver.find_elements(By.CSS_SELECTOR, "a[href*='/product/detail/']")
-                    for elem in elements:
-                        href = elem.get_attribute('href')
-                        if href and '/product/detail/' in href:
-                            links.append(href)
+                    # 여러 선택자로 시도
+                    selectors = [
+                        'a[href*="product?prdtNo="]',
+                        'a[href*="prdtNo="]',
+                        '.item-list a[href]',
+                        '.search-list-wrap a[href]'
+                    ]
+                    
+                    for selector in selectors:
+                        elements = self.driver.find_elements(By.CSS_SELECTOR, selector)
+                        for elem in elements:
+                            href = elem.get_attribute('href')
+                            if href and 'prdtNo=' in href:
+                                # 상품 번호 추출
+                                match = re.search(r'prdtNo=(\d+)', href)
+                                if match:
+                                    product_id = match.group(1)
+                                    # 표준 형식으로 저장
+                                    links.append(f"https://abcmart.a-rt.com/product?prdtNo={product_id}")
                 
                 # 스크롤
                 self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
