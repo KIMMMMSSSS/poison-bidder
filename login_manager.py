@@ -260,6 +260,13 @@ class LoginManager:
     
     def ensure_login(self) -> bool:
         """로그인 상태 확인 및 필요시 로그인"""
+        # ABC마트는 로그인 불필요
+        if self.site == "abcmart":
+            logger.info("ABC마트는 로그인 불필요")
+            if not self.driver:
+                self.init_driver()
+            return True
+        
         if not self.driver:
             self.init_driver()
         
