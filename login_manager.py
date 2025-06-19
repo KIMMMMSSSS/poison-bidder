@@ -141,6 +141,10 @@ class LoginManager:
     
     def is_logged_in(self) -> bool:
         """로그인 상태 확인"""
+        # ABC마트는 로그인 불필요
+        if self.site == "abcmart":
+            return True
+        
         if not self.driver:
             return False
         
