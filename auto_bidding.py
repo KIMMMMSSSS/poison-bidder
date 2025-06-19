@@ -209,6 +209,8 @@ class AutoBidding:
                 else:
                     logger.error("로그인 실패")
                     return []
+            elif site == 'abcmart' and not self.driver:
+                logger.info("ABC마트는 로그인 불필요, 직접 검색 시작")
             
             # 드라이버가 없으면 일반 모드로 초기화
             if not self.driver:
