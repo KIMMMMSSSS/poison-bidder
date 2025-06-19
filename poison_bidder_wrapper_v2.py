@@ -25,6 +25,8 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.common.action_chains import ActionChains
 from selenium.common.exceptions import (
     TimeoutException, 
     StaleElementReferenceException,
@@ -252,45 +254,158 @@ def worker_process_wrapper(worker_id, task_queue, result_queue, status_dict, log
         
         # 로그인 처리
         if worker_id == 1:
-            # 첫 번째 워커: 직접 로그인
+            # 첫 번째 워커: 자동 로그인
             bidder.driver.get("https://seller.poizon.com/main/dataBoard")
-            result_queue.put(("LOG", f"[Worker {worker_id}] 로그인 페이지 로드 완료. 로그인해주세요..."))
+            result_queue.put(("LOG", f"[Worker {worker_id}] 로그인 페이지 로드 중..."))
             time.sleep(5)
             
-            # 로그인 완료 대기
-            check_count = 0
-            while True:
-                check_count += 1
-                try:
-                    current_url = bidder.driver.current_url
-                    result_queue.put(("LOG", f"[Worker {worker_id}] URL 확인 #{check_count}: {current_url}"))
+            # 로그인 페이지인지 확인
+            try:
+                page_text = bidder.driver.find_element(By.TAG_NAME, "body").text
+                if "Log In" not in page_text:
+                    result_queue.put(("LOG", f"[Worker {worker_id}] 이미 로그인되어 있습니다!"))
                     
-                    if "dataBoard" in current_url and "login" not in current_url.lower():
+                    # 쿠키 저장
+                    save_cookies(bidder.driver)
+                    result_queue.put(("LOG", f"[Worker {worker_id}] 쿠키 저장 완료"))
+                    login_complete.value = True
+                else:
+                    # 자동 로그인 시작
+                    result_queue.put(("LOG", f"[Worker {worker_id}] 자동 로그인 시작..."))
+                    wait = WebDriverWait(bidder.driver, 10)
+                    
+                    # 1. 전화번호 입력
+                    result_queue.put(("LOG", f"[Worker {worker_id}] 전화번호 입력: {PHONE_NUMBER}"))
+                    phone_input = wait.until(
+                        EC.presence_of_element_located((By.ID, "mobile_number"))
+                    )
+                    phone_input.clear()
+                    phone_input.send_keys(PHONE_NUMBER)
+                    time.sleep(1)
+                    
+                    # 2. 국가 코드 선택 (South Korea +82)
+                    result_queue.put(("LOG", f"[Worker {worker_id}] 국가 코드 선택..."))
+                    country_selector = wait.until(
+                        EC.element_to_be_clickable((By.CSS_SELECTOR, ".countrySelect___rlSKW .ant-select-selector"))
+                    )
+                    country_selector.click()
+                    time.sleep(1)
+                    
+                    # JavaScript로 South Korea 선택
+                    bidder.driver.execute_script("""
+                        const dropdownList = document.querySelector('.ant-select-dropdown .rc-virtual-list-holder');
+                        if (!dropdownList) {
+                            const dropdownList = document.querySelector('.ant-select-dropdown');
+                        }
+                        
+                        const options = document.querySelectorAll('.ant-select-item-option');
+                        
+                        for (let option of options) {
+                            if (option.textContent.includes('South Korea')) {
+                                option.scrollIntoView({ block: 'center', behavior: 'smooth' });
+                                setTimeout(() => option.click(), 500);
+                                break;
+                            }
+                        }
+                    """)
+                    time.sleep(1)
+                    
+                    # 3. 비밀번호 입력
+                    result_queue.put(("LOG", f"[Worker {worker_id}] 비밀번호 입력..."))
+                    password_input = bidder.driver.find_element(By.ID, "password")
+                    password_input.clear()
+                    password_input.send_keys(PASSWORD)
+                    time.sleep(1)
+                    
+                    # 4. 로그인 버튼 클릭
+                    result_queue.put(("LOG", f"[Worker {worker_id}] 로그인 버튼 클릭..."))
+                    login_button = bidder.driver.find_element(
+                        By.XPATH, "//button[span[text()='Log In']]"
+                    )
+                    login_button.click()
+                    
+                    # 로그인 완료 대기
+                    result_queue.put(("LOG", f"[Worker {worker_id}] 로그인 처리 중..."))
+                    time.sleep(5)
+                    
+                    # 로그인 성공 확인
+                    check_count = 0
+                    while check_count < 30:  # 최대 30초 대기
+                        check_count += 1
                         try:
-                            search_box = bidder.driver.find_element(By.XPATH, "//input[@id='Item Info']")
-                            if search_box:
-                                result_queue.put(("LOG", f"[Worker {worker_id}] 검색창 발견! 로그인 성공!"))
+                            current_url = bidder.driver.current_url
+                            
+                            if "dataBoard" in current_url and "login" not in current_url.lower():
+                                try:
+                                    search_box = bidder.driver.find_element(By.XPATH, "//input[@id='Item Info']")
+                                    if search_box:
+                                        result_queue.put(("LOG", f"[Worker {worker_id}] 검색창 발견! 로그인 성공!"))
+                                        
+                                        # 쿠키 저장
+                                        save_cookies(bidder.driver)
+                                        result_queue.put(("LOG", f"[Worker {worker_id}] 쿠키 저장 완료"))
+                                        
+                                        login_complete.value = True
+                                        break
+                                except:
+                                    tables = bidder.driver.find_elements(By.CSS_SELECTOR, "table")
+                                    if tables:
+                                        result_queue.put(("LOG", f"[Worker {worker_id}] 테이블 발견! 로그인 성공!"))
+                                        
+                                        # 쿠키 저장
+                                        save_cookies(bidder.driver)
+                                        result_queue.put(("LOG", f"[Worker {worker_id}] 쿠키 저장 완료"))
+                                        
+                                        login_complete.value = True
+                                        break
+                        except Exception as e:
+                            result_queue.put(("LOG", f"[Worker {worker_id}] 로그인 체크 중 오류: {type(e).__name__}"))
+                        
+                        time.sleep(1)
+                    
+                    if not login_complete.value:
+                        result_queue.put(("ERROR", f"[Worker {worker_id}] 자동 로그인 실패. 수동 로그인이 필요합니다."))
+                        result_queue.put(("LOG", f"[Worker {worker_id}] 수동 로그인 대기 중..."))
+                        
+                        # 수동 로그인 대기
+                        while not login_complete.value:
+                            check_count += 1
+                            try:
+                                current_url = bidder.driver.current_url
+                                result_queue.put(("LOG", f"[Worker {worker_id}] URL 확인 #{check_count}: {current_url}"))
                                 
-                                # 쿠키 저장
-                                save_cookies(bidder.driver)
-                                result_queue.put(("LOG", f"[Worker {worker_id}] 쿠키 저장 완료"))
-                                
-                                login_complete.value = True
-                                break
-                        except:
-                            tables = bidder.driver.find_elements(By.CSS_SELECTOR, "table")
-                            if tables:
-                                result_queue.put(("LOG", f"[Worker {worker_id}] 테이블 발견! 로그인 성공!"))
-                                
-                                # 쿠키 저장
-                                save_cookies(bidder.driver)
-                                result_queue.put(("LOG", f"[Worker {worker_id}] 쿠키 저장 완료"))
-                                
-                                login_complete.value = True
-                                break
-                except Exception as e:
-                    result_queue.put(("LOG", f"[Worker {worker_id}] 로그인 체크 중 오류: {type(e).__name__}"))
+                                if "dataBoard" in current_url and "login" not in current_url.lower():
+                                    # 로그인 성공 확인
+                                    try:
+                                        search_box = bidder.driver.find_element(By.XPATH, "//input[@id='Item Info']")
+                                        if search_box:
+                                            result_queue.put(("LOG", f"[Worker {worker_id}] 검색창 발견! 로그인 성공!"))
+                                            
+                                            # 쿠키 저장
+                                            save_cookies(bidder.driver)
+                                            result_queue.put(("LOG", f"[Worker {worker_id}] 쿠키 저장 완료"))
+                                            
+                                            login_complete.value = True
+                                            break
+                                    except:
+                                        tables = bidder.driver.find_elements(By.CSS_SELECTOR, "table")
+                                        if tables:
+                                            result_queue.put(("LOG", f"[Worker {worker_id}] 테이블 발견! 로그인 성공!"))
+                                            
+                                            # 쿠키 저장
+                                            save_cookies(bidder.driver)
+                                            result_queue.put(("LOG", f"[Worker {worker_id}] 쿠키 저장 완료"))
+                                            
+                                            login_complete.value = True
+                                            break
+                            except Exception as e:
+                                result_queue.put(("LOG", f"[Worker {worker_id}] 로그인 체크 중 오류: {type(e).__name__}"))
+                            
+                            time.sleep(3)
                 
+            except Exception as e:
+                result_queue.put(("ERROR", f"[Worker {worker_id}] 로그인 처리 중 오류: {str(e)}"))
+                result_queue.put(("LOG", f"[Worker {worker_id}] 수동 로그인 대기 중..."))
                 if check_count % 10 == 0:
                     result_queue.put(("LOG", f"[Worker {worker_id}] 로그인 대기중... (체크 횟수: {check_count})"))
                     
