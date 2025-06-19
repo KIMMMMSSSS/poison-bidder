@@ -42,6 +42,14 @@ try:
 except ImportError:
     POISON_LOGIN_AVAILABLE = False
 
+# ABC마트 멀티프로세스 스크래퍼 import
+try:
+    from abcmart_scraper_improved_backup import AbcmartMultiprocessScraper, AbcmartWorker
+    ABCMART_MULTIPROCESS_AVAILABLE = True
+except ImportError:
+    ABCMART_MULTIPROCESS_AVAILABLE = False
+    print("ABC마트 멀티프로세스 스크래퍼를 사용할 수 없습니다.")
+
 # 로깅 설정
 log_dir = Path("C:/poison_final/logs")
 log_dir.mkdir(exist_ok=True)
@@ -305,6 +313,44 @@ class AutoBidding:
         """자동 스크래핑"""
         items = []
         
+        # ABC마트의 경우 멀티프로세스 스크래퍼 사용
+        if site == "abcmart" and ABCMART_MULTIPROCESS_AVAILABLE:
+            logger.info("ABC마트 멀티프로세스 스크래퍼 사용")
+            try:
+                # 멀티프로세스 스크래퍼 초기화
+                scraper = AbcmartMultiprocessScraper(max_workers=5)
+                
+                # 스크래핑 실행
+                products_data = scraper.run_multiprocess(links, output_file=None)
+                
+                # 데이터 형식 변환
+                for product in products_data:
+                    if not product or not product.get('sizes_prices'):
+                        continue
+                    
+                    # 각 사이즈별로 아이템 생성
+                    for size_info in product['sizes_prices']:
+                        item = {
+                            'link': product['url'],
+                            'brand': product['brand'],
+                            'name': product['product_name'],
+                            'code': product['product_code'],
+                            'color': product.get('color', ''),
+                            'size': size_info['size'],
+                            'price': size_info['price'],
+                            'sizes': [size_info['size']],  # 호환성을 위한 리스트 형태
+                            'colors': [product.get('color', '')] if product.get('color') else []
+                        }
+                        items.append(item)
+                
+                logger.info(f"ABC마트 멀티프로세스 스크래핑 완료: {len(items)}개 아이템")
+                return items
+                
+            except Exception as e:
+                logger.error(f"ABC마트 멀티프로세스 스크래핑 실패: {e}")
+                # 실패 시 일반 스크래핑으로 전환
+        
+        # 일반 스크래핑 (무신사 또는 ABC마트 멀티프로세스 실패 시)
         for i, link in enumerate(links):
             try:
                 logger.info(f"스크래핑 {i+1}/{len(links)}: {link}")

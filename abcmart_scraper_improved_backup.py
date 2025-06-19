@@ -922,8 +922,8 @@ class AbcmartMultiprocessScraper:
             
             print(f"✅ 데이터 저장 완료: {json_filename}")
             
-            # 입찰 파일 생성
-            if products_data:
+            # 입찰 파일 생성 (output_file이 지정된 경우만)
+            if products_data and output_file:
                 self.generate_bid_file(products_data, output_file)
             
             # 로깅
