@@ -14,6 +14,9 @@ from pathlib import Path
 from typing import List, Dict, Any, Optional
 import traceback
 
+# poison_integrated_bidding import 추가
+from poison_integrated_bidding import AutoBiddingAdapter
+
 # 로깅 설정
 log_dir = Path("logs")
 log_dir.mkdir(exist_ok=True)
@@ -220,21 +223,53 @@ class UnifiedBidding:
         return adjusted_items
     
     def _execute_bidding(self, site: str, items: List[Dict[str, Any]], exec_mode: str) -> List[Dict[str, Any]]:
-        """입찰 실행 (실제 구현 필요)"""
-        # TODO: 실제 입찰 실행 로직 구현
-        logger.warning("입찰 실행 기능은 아직 구현되지 않았습니다.")
+        """포이즌 통합 입찰 실행"""
+        logger.info("포이즌 통합 입찰 시스템을 사용한 입찰 실행")
         
-        # 임시 결과
-        results = []
-        for item in items:
-            results.append({
-                'item_code': item['code'],
-                'success': True,
-                'message': '테스트 입찰 성공',
-                'timestamp': datetime.now().isoformat()
-            })
+        try:
+            # AutoBiddingAdapter를 사용한 입찰 실행
+            adapter = AutoBiddingAdapter()
+            result = adapter.run_with_poison(items)
             
-        return results
+            # 결과 형식 변환
+            bid_results = []
+            
+            # 입찰 결과가 있는 경우
+            if result.get('status') == 'success' and 'results' in result:
+                for item, res in zip(items, result.get('results', [])):
+                    bid_results.append({
+                        'item_code': item.get('code'),
+                        'success': res.get('success', False),
+                        'message': res.get('message', ''),
+                        'timestamp': res.get('timestamp', datetime.now().isoformat())
+                    })
+            else:
+                # 에러가 발생한 경우 모든 아이템에 대해 실패 처리
+                for item in items:
+                    bid_results.append({
+                        'item_code': item.get('code'),
+                        'success': False,
+                        'message': result.get('message', '입찰 실행 실패'),
+                        'timestamp': datetime.now().isoformat()
+                    })
+            
+            # 결과 로깅
+            successful_count = sum(1 for r in bid_results if r.get('success', False))
+            logger.info(f"입찰 완료: 성공 {successful_count}/{len(bid_results)}")
+            
+            return bid_results
+            
+        except Exception as e:
+            logger.error(f"입찰 실행 중 오류 발생: {e}")
+            logger.error(traceback.format_exc())
+            
+            # 오류 발생 시 모든 아이템에 대해 실패 반환
+            return [{
+                'item_code': item.get('code'),
+                'success': False,
+                'message': f'입찰 실행 오류: {str(e)}',
+                'timestamp': datetime.now().isoformat()
+            } for item in items]
     
     def _save_results(self):
         """결과 저장"""

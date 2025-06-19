@@ -16,6 +16,9 @@ from typing import List, Dict, Any, Optional
 # 포이즌 직접 로그인 import
 from poison_direct_login import login_to_poison
 
+# 포이즌 입찰 Wrapper import
+from poison_bidder_wrapper_v2 import PoizonBidderWrapperV2
+
 # 로깅 설정
 log_dir = Path('C:/poison_final/logs')
 log_dir.mkdir(exist_ok=True)
@@ -146,47 +149,97 @@ class PoisonIntegratedBidding:
 
 # 기존 auto_bidding.py와 통합하는 어댑터
 class AutoBiddingAdapter:
-    """기존 auto_bidding.py와 통합"""
+    """기존 auto_bidding.py와 통합 - 실제 포이즌 입찰 수행"""
     
-    def __init__(self):
-        self.poison_bidder = PoisonIntegratedBidding()
+    def __init__(self, driver_path: str = None, min_profit: int = 0, worker_count: int = 5):
+        self.driver_path = driver_path
+        self.min_profit = min_profit
+        self.worker_count = worker_count
+        self.poison_bidder = None
         
     def run_with_poison(self, items: List[Dict[str, Any]]) -> Dict[str, Any]:
         """
-        포이즌으로 입찰 실행
+        포이즌으로 입찰 실행 - 실제 0923_fixed_multiprocess_cookie_v2.py 사용
         
         Args:
             items: auto_bidding.py에서 조정된 상품 목록
         """
-        # 포이즌 로그인
-        if not self.poison_bidder.initialize():
+        try:
+            logger.info("포이즌 입찰 시작 (PoizonBidderWrapperV2 사용)")
+            
+            # PoizonBidderWrapper 인스턴스 생성
+            self.poison_bidder = PoizonBidderWrapperV2(
+                driver_path=self.driver_path,
+                min_profit=self.min_profit,
+                worker_count=self.worker_count
+            )
+            
+            # 입찰 실행 (unified_items 파라미터 사용)
+            result = self.poison_bidder.run_bidding(unified_items=items)
+            
+            # 결과 로깅
+            logger.info(f"포이즌 입찰 완료 - 성공: {result.get('success', 0)}/{result.get('total_codes', 0)}")
+            
+            # 결과 형식 통일
+            return {
+                'status': result.get('status', 'error'),
+                'total': result.get('total_codes', 0),
+                'successful': result.get('success', 0),
+                'failed': result.get('failed', 0),
+                'results': self._convert_results(items, result.get('details', [])),
+                'execution_time': result.get('execution_time', 0),
+                'fail_log_path': result.get('fail_log_path')
+            }
+            
+        except Exception as e:
+            logger.error(f"포이즌 입찰 실행 중 오류: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            
             return {
                 'status': 'error',
-                'message': '포이즌 로그인 실패'
+                'message': str(e),
+                'total': 0,
+                'successful': 0,
+                'failed': len(items),
+                'results': []
             }
+    
+    def _convert_results(self, items: List[Dict[str, Any]], bid_results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        포이즌 입찰 결과를 통합 시스템 형식으로 변환
+        """
+        converted_results = []
         
-        # 입찰 목록 준비
-        bid_list = []
+        # 코드별로 결과 매핑
+        code_results = {}
+        for result in bid_results:
+            code = result.get('code')
+            if code:
+                code_results[code] = result
+        
+        # 아이템별 결과 생성
         for item in items:
-            bid_list.append({
-                'url': item.get('link'),  # 포이즌 URL로 변환 필요
-                'price': item.get('adjusted_price'),
-                'size': item.get('size', '100')
-            })
+            code = item.get('code', '')
+            result = code_results.get(code, {})
+            
+            # 각 아이템의 입찰 결과
+            item_result = {
+                'product_url': item.get('link', ''),
+                'item_code': code,
+                'brand': item.get('brand', ''),
+                'size': item.get('size', ''),
+                'color': item.get('color', ''),
+                'bid_price': item.get('adjusted_price', item.get('price', 0)),
+                'success': result.get('status') == 'success' if result else False,
+                'message': result.get('message', '입찰 결과 없음'),
+                'worker_id': result.get('worker_id'),
+                'timestamp': datetime.now().isoformat()
+            }
+            
+            converted_results.append(item_result)
         
-        # 배치 입찰
-        results = self.poison_bidder.batch_bidding(bid_list)
-        
-        # 결과 요약
-        successful = sum(1 for r in results if r.get('success', False))
-        
-        return {
-            'status': 'success',
-            'total': len(results),
-            'successful': successful,
-            'failed': len(results) - successful,
-            'results': results
-        }
+        return converted_results
 
 
 # unified_bidding.py와 통합

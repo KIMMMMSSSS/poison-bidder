@@ -197,8 +197,8 @@ class AutoBidding:
         links = []
         
         try:
-            # 로그인 관리자 사용
-            if LOGIN_MANAGER_AVAILABLE and not self.driver:
+            # 로그인 관리자 사용 (ABC마트는 제외)
+            if site != 'abcmart' and LOGIN_MANAGER_AVAILABLE and not self.driver:
                 logger.info("로그인 확인 중...")
                 self.login_manager = LoginManager(site)
                 
