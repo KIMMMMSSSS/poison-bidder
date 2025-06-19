@@ -189,6 +189,11 @@ class LoginManager:
     
     def manual_login(self) -> bool:
         """수동 로그인 (사용자가 직접 로그인)"""
+        # ABC마트는 로그인 불필요
+        if self.site == "abcmart":
+            logger.info("ABC마트는 로그인이 필요하지 않습니다")
+            return True
+        
         if not self.driver:
             self.init_driver(headless=False)
         
