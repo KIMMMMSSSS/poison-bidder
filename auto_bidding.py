@@ -35,15 +35,15 @@ except ImportError:
     LOGIN_MANAGER_AVAILABLE = False
     print("로그인 관리자를 사용할 수 없습니다.")
 
-# 포이즌 로그인 매니저 import
+# 포이즌 통합 입찰 import
 try:
-    from poison_login_manager import poison_login
+    from poison_integrated_bidding import AutoBiddingAdapter
     POISON_LOGIN_AVAILABLE = True
 except ImportError:
     POISON_LOGIN_AVAILABLE = False
 
 # 로깅 설정
-log_dir = Path("logs")
+log_dir = Path("C:/poison_final/logs")
 log_dir.mkdir(exist_ok=True)
 
 logging.basicConfig(
@@ -345,54 +345,59 @@ class AutoBidding:
         """자동 입찰 실행"""
         results = []
         
-        # 포이즌 로그인 확인 (세션 기반)
+        # 포이즌 통합 입찰 사용
         if POISON_LOGIN_AVAILABLE:
-            logger.info("포이즌 세션 확인 중...")
+            logger.info("포이즌 통합 입찰 시스템 초기화 중...")
             try:
-                # 포이즌 드라이버 가져오기 (로그인 포함)
-                poison_driver = poison_login.get_driver()
-                logger.info("포이즌 로그인 확인 완료")
+                # AutoBiddingAdapter 사용
+                adapter = AutoBiddingAdapter()
                 
-                # 각 상품에 대해 입찰 실행
+                # 입찰 목록 준비 (나중에 포이즌 URL로 변환 필요)
+                bid_list = []
                 for item in items:
-                    try:
-                        # TODO: 실제 입찰 로직 구현
-                        # 예: poison_login.execute_bidding(item['link'], item['adjusted_price'])
-                        
-                        result = {
-                            'item': item['name'] if 'name' in item else item['link'],
-                            'price': item['adjusted_price'],
-                            'success': True,
-                            'message': '입찰 성공 (시뮬레이션)',
-                            'timestamp': datetime.now().isoformat()
-                        }
-                        results.append(result)
-                        logger.info(f"입찰: {result['item']} - {result['price']}원")
-                        
-                    except Exception as e:
-                        logger.error(f"입찰 오류: {e}")
+                    bid_list.append({
+                        'url': item.get('link'),  # TODO: 포이즌 URL로 변환 필요
+                        'price': item.get('adjusted_price'),
+                        'size': item.get('sizes', ['100'])[0] if item.get('sizes') else '100'
+                    })
+                
+                # 포이즌로 입찰 실행
+                bid_result = adapter.run_with_poison(items)
+                
+                # 결과 변환
+                if bid_result['status'] == 'success':
+                    results = bid_result.get('results', [])
+                    logger.info(f"포이즌 입찰 완료: 성공 {bid_result['successful']}, 실패 {bid_result['failed']}")
+                else:
+                    logger.error(f"포이즌 입찰 실패: {bid_result.get('message')}")
+                    # 실패 시 기본 결과 반환
+                    for item in items:
                         results.append({
                             'item': item.get('name', item['link']),
-                            'price': item['adjusted_price'],
+                            'price': item.get('adjusted_price'),
                             'success': False,
-                            'message': str(e),
+                            'message': bid_result.get('message', '포이즌 로그인 실패'),
                             'timestamp': datetime.now().isoformat()
                         })
                 
             except Exception as e:
-                logger.error(f"포이즌 로그인 실패: {e}")
-                return [{
-                    'item': item.get('name', item['link']),
-                    'success': False,
-                    'message': '포이즌 로그인 필요',
-                    'timestamp': datetime.now().isoformat()
-                } for item in items]
+                logger.error(f"포이즌 통합 입찰 오류: {e}")
+                # 오류 발생 시 기본 결과 반환
+                for item in items:
+                    results.append({
+                        'item': item.get('name', item['link']),
+                        'price': item.get('adjusted_price'),
+                        'success': False,
+                        'message': str(e),
+                        'timestamp': datetime.now().isoformat()
+                    })
         else:
-            # 포이즌 로그인 매니저 없이 시뮬레이션
+            # 포이즌 통합 입찰 없이 시뮬레이션
+            logger.warning("포이즌 통합 입찰 모듈이 설치되지 않음. 시뮬레이션 모드로 실행.")
             for item in items:
                 result = {
                     'item': item['name'] if 'name' in item else item['link'],
-                    'price': item['adjusted_price'],
+                    'price': item.get('adjusted_price'),
                     'success': True,
                     'message': '입찰 성공 (시뮬레이션)',
                     'timestamp': datetime.now().isoformat()
