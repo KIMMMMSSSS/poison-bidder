@@ -35,6 +35,13 @@ except ImportError:
     LOGIN_MANAGER_AVAILABLE = False
     print("로그인 관리자를 사용할 수 없습니다.")
 
+# 포이즌 로그인 매니저 import
+try:
+    from poison_login_manager import poison_login
+    POISON_LOGIN_AVAILABLE = True
+except ImportError:
+    POISON_LOGIN_AVAILABLE = False
+
 # 로깅 설정
 log_dir = Path("logs")
 log_dir.mkdir(exist_ok=True)
@@ -338,39 +345,60 @@ class AutoBidding:
         """자동 입찰 실행"""
         results = []
         
-        # 포이즌 사이트 로그인 확인
-        if LOGIN_MANAGER_AVAILABLE:
-            logger.info("포이즌 사이트 로그인 확인 중...")
-            poison_login = LoginManager("poison")
-            
-            if not poison_login.ensure_login():
-                logger.error("포이즌 사이트 로그인 실패!")
-                logger.error("입찰을 실행하려면 포이즌 사이트에 로그인해야 합니다.")
-                logger.info("python test_login.py poison 명령으로 로그인하세요.")
+        # 포이즌 로그인 확인 (세션 기반)
+        if POISON_LOGIN_AVAILABLE:
+            logger.info("포이즌 세션 확인 중...")
+            try:
+                # 포이즌 드라이버 가져오기 (로그인 포함)
+                poison_driver = poison_login.get_driver()
+                logger.info("포이즌 로그인 확인 완료")
+                
+                # 각 상품에 대해 입찰 실행
+                for item in items:
+                    try:
+                        # TODO: 실제 입찰 로직 구현
+                        # 예: poison_login.execute_bidding(item['link'], item['adjusted_price'])
+                        
+                        result = {
+                            'item': item['name'] if 'name' in item else item['link'],
+                            'price': item['adjusted_price'],
+                            'success': True,
+                            'message': '입찰 성공 (시뮬레이션)',
+                            'timestamp': datetime.now().isoformat()
+                        }
+                        results.append(result)
+                        logger.info(f"입찰: {result['item']} - {result['price']}원")
+                        
+                    except Exception as e:
+                        logger.error(f"입찰 오류: {e}")
+                        results.append({
+                            'item': item.get('name', item['link']),
+                            'price': item['adjusted_price'],
+                            'success': False,
+                            'message': str(e),
+                            'timestamp': datetime.now().isoformat()
+                        })
+                
+            except Exception as e:
+                logger.error(f"포이즌 로그인 실패: {e}")
                 return [{
                     'item': item.get('name', item['link']),
                     'success': False,
-                    'message': '포이즌 사이트 로그인 필요',
+                    'message': '포이즌 로그인 필요',
                     'timestamp': datetime.now().isoformat()
                 } for item in items]
-            
-            logger.info("포이즌 사이트 로그인 확인 완료")
-            # 여기서 poison_login.driver를 사용해서 실제 입찰 실행
-            # TODO: 실제 입찰 로직 구현
-        
-        for item in items:
-            # 실제 입찰 로직은 구현 필요
-            # 여기서는 시뮬레이션
-            result = {
-                'item': item['name'] if 'name' in item else item['link'],
-                'price': item['adjusted_price'],
-                'success': True,  # 실제로는 입찰 결과
-                'message': '입찰 성공',
-                'timestamp': datetime.now().isoformat()
-            }
-            results.append(result)
-            
-            logger.info(f"입찰: {result['item']} - {result['price']}원")
+        else:
+            # 포이즌 로그인 매니저 없이 시뮬레이션
+            for item in items:
+                result = {
+                    'item': item['name'] if 'name' in item else item['link'],
+                    'price': item['adjusted_price'],
+                    'success': True,
+                    'message': '입찰 성공 (시뮬레이션)',
+                    'timestamp': datetime.now().isoformat()
+                }
+                results.append(result)
+                logger.info(f"입찰: {result['item']} - {result['price']}원")
         
         return results
     

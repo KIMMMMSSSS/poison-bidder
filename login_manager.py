@@ -61,12 +61,12 @@ class LoginManager:
                 "login_button": ".login-btn"
             },
             "poison": {
-                "login_url": "https://poison-seller.com/login",  # 실제 URL로 변경 필요
-                "home_url": "https://poison-seller.com",
-                "login_check_selector": ".user-info",  # 실제 셀렉터로 변경 필요
-                "id_field": "username",  # 실제 필드명으로 변경 필요
-                "pw_field": "password",  # 실제 필드명으로 변경 필요
-                "login_button": "button[type='submit']"  # 실제 버튼으로 변경 필요
+                "login_url": "https://seller.poizon.com",  # 로그인 페이지가 메인 페이지
+                "home_url": "https://seller.poizon.com",
+                "login_check_selector": ".user-name, .user-info, .avatar, span[class*='user'], div[class*='user']",
+                "id_field": "username",
+                "pw_field": "password",
+                "login_button": "button[type='submit'], .login-btn, .submit-btn"
             }
         }
         
@@ -82,11 +82,6 @@ class LoginManager:
         
         if headless:
             options.add_argument("--headless")
-        
-        # 사용자 데이터 디렉터리 설정 (로그인 유지)
-        user_data_dir = Path("chrome_data") / self.site
-        user_data_dir.mkdir(parents=True, exist_ok=True)
-        options.add_argument(f"--user-data-dir={user_data_dir.absolute()}")
         
         self.driver = uc.Chrome(options=options, version_main=None)
         return self.driver
@@ -150,12 +145,42 @@ class LoginManager:
             return False
         
         try:
-            # 마이페이지나 로그인 확인 요소 찾기
-            WebDriverWait(self.driver, 5).until(
-                EC.presence_of_element_located((By.CSS_SELECTOR, self.config['login_check_selector']))
-            )
-            return True
-        except:
+            # 포이즌은 특별 처리 - 로그인 페이지 텍스트로 확인
+            if self.site == "poison":
+                time.sleep(2)  # 페이지 로드 대기
+                page_text = self.driver.find_element(By.TAG_NAME, "body").text.lower()
+                
+                # 로그인 페이지 키워드가 있으면 로그인 안됨
+                login_keywords = ["log in", "login", "phone number", "email address", "password"]
+                
+                # 로그인된 상태 키워드
+                logged_in_keywords = ["dashboard", "seller", "product", "order", "inventory"]
+                
+                # 로그인 페이지 키워드가 있고, 로그인된 상태 키워드가 없으면 로그인 필요
+                has_login_form = any(keyword in page_text for keyword in login_keywords)
+                has_dashboard = any(keyword in page_text for keyword in logged_in_keywords)
+                
+                # 디버깅용 로그
+                logger.info(f"포이즌 페이지 텍스트 일부: {page_text[:100]}...")
+                logger.info(f"로그인 폼 발견: {has_login_form}, 대시보드 발견: {has_dashboard}")
+                
+                # 대시보드가 있으면 로그인됨, 로그인 폼만 있으면 로그인 안됨
+                return has_dashboard or (not has_login_form)
+            
+            # 다른 사이트는 기존 방식
+            selectors = self.config['login_check_selector'].split(', ')
+            for selector in selectors:
+                try:
+                    elements = self.driver.find_elements(By.CSS_SELECTOR, selector)
+                    if elements:
+                        return True
+                except:
+                    continue
+            
+            return False
+            
+        except Exception as e:
+            logger.warning(f"로그인 확인 중 오류: {e}")
             return False
     
     def manual_login(self) -> bool:
