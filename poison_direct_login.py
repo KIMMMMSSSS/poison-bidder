@@ -76,10 +76,11 @@ def login_to_poison():
         
         # 2. 국가 코드 선택 (South Korea +82)
         logger.info("국가 코드 선택...")
-        country_select = wait.until(
-            EC.element_to_be_clickable((By.ID, "mobile_code"))
+        # 드롭다운 화살표 클릭
+        country_dropdown = wait.until(
+            EC.element_to_be_clickable((By.CLASS_NAME, "ant-select-arrow"))
         )
-        country_select.click()
+        country_dropdown.click()
         time.sleep(1)
         
         # South Korea 옵션 찾아서 클릭
