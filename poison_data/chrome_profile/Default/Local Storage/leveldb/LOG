@@ -1,0 +1,14 @@
+2025/06/19-15:34:43.103 466c Reusing MANIFEST C:\poison_final\poison_data\chrome_profile\Default\Local Storage\leveldb/MANIFEST-000001
+2025/06/19-15:34:43.106 466c Recovering log #23
+2025/06/19-15:34:43.108 466c Level-0 table #25: started
+2025/06/19-15:34:43.117 466c Level-0 table #25: 86138 bytes OK
+2025/06/19-15:34:43.122 466c Delete type=0 #23
+2025/06/19-15:34:43.123 3708 Compacting 4@0 + 1@1 files
+2025/06/19-15:34:43.137 3708 Generated table #27@0: 33 keys, 88110 bytes
+2025/06/19-15:34:43.137 3708 Compacted 4@0 + 1@1 files => 88110 bytes
+2025/06/19-15:34:43.139 3708 compacted to: files[ 0 1 0 0 0 0 0 ]
+2025/06/19-15:34:43.140 3708 Delete type=2 #14
+2025/06/19-15:34:43.140 3708 Delete type=2 #16
+2025/06/19-15:34:43.140 3708 Delete type=2 #19
+2025/06/19-15:34:43.140 3708 Delete type=2 #22
+2025/06/19-15:34:43.140 3708 Delete type=2 #25

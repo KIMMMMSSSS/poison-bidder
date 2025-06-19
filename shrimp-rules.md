@@ -1,205 +1,126 @@
-# K-Fashion 자동 입찰 시스템 개발 가이드라인
+# Development Guidelines
 
-## 프로젝트 개요
+## Project Overview
+- 포이즌(Poizon) 플랫폼 자동 입찰 시스템
+- 텔레그램 봇을 통한 제어 및 모니터링
+- 무신사, ABC마트 등 쇼핑몰에서 상품 정보 수집 후 포이즌에 자동 입찰
 
-- **목적**: K-Fashion 쇼핑몰 자동 입찰 시스템 통합 및 24시간 자동화
-- **핵심 흐름**: 가격조정 설정 → 링크 추출 → 상품 스크래핑 → 가격 적용 → 자동 입찰
-- **기술 스택**: Python 3.x, SQLite, Telegram Bot API, APScheduler
-- **대상 사이트**: 무신사(Musinsa), ABC마트(ABCMart)
+## Project Architecture
 
-## 프로젝트 아키텍처
+### Main Directories
+- `/` - 프로젝트 루트 (C:\poison_final)
+- `/config` - 설정 파일들 (pricing_strategies.json 등)
+- `/cookies` - 사이트별 쿠키 파일 저장
+- `/logs` - 모든 로그 파일 저장 (필수 경로: C:\poison_final\logs)
+- `/output` - 실행 결과 파일 저장
+- `/db` - SQLite 데이터베이스
+- `/input` - 입력 데이터 파일
 
-### 주요 모듈 구성
+### Core Modules
+- `telegram_bot.py` - 메인 텔레그램 봇 제어
+- `auto_bidding.py` - 자동 입찰 파이프라인
+- `unified_bidding.py` - 통합 입찰 실행
+- `poison_integrated_bidding.py` - 포이즌 입찰 어댑터
+- `abcmart_scraper_improved_backup.py` - ABC마트 스크래퍼
+- `musinsa_scraper_improved.py` - 무신사 스크래퍼
 
-- **가격 조정 모듈**: price_adjuster_gui.py 기반, GUI 제거 후 설정 파일 방식
-- **링크 추출 모듈**: musinsa_link_extractor.py, abcmart_link_extractor.py
-- **스크래핑 모듈**: musinsa_scraper_improved.py, abcmart_scraper_improved_backup.py  
-- **입찰 실행 모듈**: 0923_fixed_multiprocess_cookie_v2.py
-- **통합 컨트롤러**: 새로 생성할 unified_bidding_system.py
-- **텔레그램 봇**: 새로 생성할 telegram_bot.py
+## Code Standards
 
-### 디렉토리 구조
+### Import Order
+1. 표준 라이브러리
+2. 서드파티 라이브러리
+3. 로컬 모듈
 
-```
-C:\poison_final\
-├── config/              # 설정 파일
-│   ├── pricing_strategy.json    # 가격 조정 전략
-│   ├── telegram_config.json     # 텔레그램 봇 설정
-│   └── schedule_config.json     # 스케줄링 설정
-├── modules/             # 핵심 모듈
-│   ├── pricing/         # 가격 조정 관련
-│   ├── extraction/      # 링크 추출 관련
-│   ├── scraping/        # 스크래핑 관련
-│   └── bidding/         # 입찰 실행 관련
-├── bot/                 # 텔레그램 봇
-├── db/                  # SQLite 데이터베이스
-├── logs/                # 로그 파일
-└── data/                # 입출력 데이터
-```
+### Error Handling
+- 모든 예외는 logs 디렉토리에 기록
+- 사용자에게는 간단한 메시지만 표시
+- traceback은 로그 파일에만 저장
 
-## 코드 표준
+### Database
+- MySQL 접속 정보는 .env 파일에서 관리
+- 접속 형식: `mysql -u root -e "QUERY;" DB_NAME`
+- 쿼리는 반드시 따옴표로 감싸야 함
 
-### 필수 준수 사항
+## Functionality Implementation Standards
 
-- **GUI 제거**: tkinter, customtkinter 등 모든 GUI 관련 코드 제거
-- **설정 파일 사용**: 하드코딩 금지, 모든 설정은 JSON 파일로 관리
-- **클래스 구조**: 각 모듈은 BaseModule 추상 클래스 상속
-- **비동기 처리**: 긴 작업은 반드시 비동기(async/await) 또는 스레드 사용
-- **로깅**: 모든 로그는 C:\poison_final\logs 디렉토리에 저장
+### 로그인 처리
+- **무신사**: 로그인 필수 (LoginManager 사용)
+- **ABC마트**: 로그인 불필요 - 로그인 체크 로직 건너뛰기
+- **포이즌**: 로그인 필수 (쿠키 기반)
 
-### 명명 규칙
+### 스크래핑 규칙
+- 4자리 사이즈는 제외 (예: 1000)
+- 신발 사이즈 범위: 220-310
+- 재고 5개 미만 상품 제외
+- ABC마트는 회원 최대혜택가 우선 적용
 
-- **클래스**: PascalCase (예: PriceAdjuster, LinkExtractor)
-- **함수/메서드**: snake_case (예: extract_links, apply_discount)
-- **상수**: UPPER_SNAKE_CASE (예: MAX_RETRY_COUNT, DEFAULT_TIMEOUT)
-- **파일명**: snake_case (예: price_adjuster.py, telegram_bot.py)
+### 파일 작업
+- 파일 생성/수정 후 반드시 git add 및 commit
+- 대용량 파일은 3-5개 섹션으로 나누어 처리
+- 파일 편집 전 항상 해당 부분 재확인
 
-## 기능 구현 표준
+## Framework/Plugin/Third-party Library Usage Standards
 
-### 가격 조정 모듈 변환
+### Selenium/Undetected ChromeDriver
+- 워커별 고유 포트 사용 (9222 + worker_id)
+- 워커별 임시 디렉토리 생성
+- headless 모드 기본 사용
+- Chrome 프로세스는 작업 완료 후 강제 종료
 
-- price_adjuster_gui.py의 GUI 부분 제거
-- PriceAdjuster 클래스로 리팩토링
-- calculate_adjusted_price() 메서드 보존
-- 설정은 pricing_strategy.json에서 로드
+### 텔레그램 봇
+- python-telegram-bot 라이브러리 사용
+- 콜백 쿼리는 항상 응답 필요
+- 긴 작업은 비동기 처리
 
-### 통합 시스템 구현
+## Workflow Standards
 
-- UnifiedBiddingSystem 클래스 생성
-- 각 모듈을 순차적으로 실행하는 run_pipeline() 메서드
-- 각 단계별 결과를 SQLite DB에 저장
-- 실패 시 재시도 로직 (최대 3회)
+### 자동 입찰 워크플로우
+1. 키워드로 상품 검색
+2. 링크 추출 (사이트별 로그인 체크)
+3. 상품 정보 스크래핑
+4. 가격 조정 (전략 적용)
+5. 포이즌 입찰 실행
+6. 결과 저장 및 알림
 
-### 데이터베이스 스키마
+### Git 워크플로우
+1. 변경사항은 test 브랜치에서 작업
+2. 충분한 테스트 후 master에 병합
+3. 파일 작업마다 의미있는 커밋 메시지
 
-```sql
--- 작업 큐 테이블
-CREATE TABLE bid_jobs (
-    id INTEGER PRIMARY KEY,
-    status TEXT,
-    created_at TIMESTAMP,
-    completed_at TIMESTAMP,
-    settings TEXT,
-    result TEXT
-);
+## Key File Interaction Standards
 
--- 가격 전략 테이블
-CREATE TABLE pricing_strategies (
-    id INTEGER PRIMARY KEY,
-    name TEXT,
-    coupon_rate REAL,
-    points_rate REAL,
-    premium_settings TEXT,
-    cashback_rate REAL
-);
+### 동시 수정 필요 파일
+- `auto_bidding.py` 수정 시 → `telegram_bot.py` 확인
+- 가격 전략 변경 시 → `config/pricing_strategies.json` 수정
+- 로그 경로 변경 금지 → 항상 `C:\poison_final\logs` 사용
 
--- 입찰 히스토리 테이블
-CREATE TABLE bid_history (
-    id INTEGER PRIMARY KEY,
-    job_id INTEGER,
-    product_code TEXT,
-    original_price INTEGER,
-    adjusted_price INTEGER,
-    bid_result TEXT,
-    timestamp TIMESTAMP
-);
-```
+### 데이터 흐름
+- 텔레그램 봇 → auto_bidding → scraper → poison_integrated_bidding
+- 결과는 항상 output 디렉토리에 JSON 형식으로 저장
+- 로그는 항상 logs 디렉토리에 날짜별로 저장
 
-### 텔레그램 봇 명령어
+## AI Decision-making Standards
 
-- `/start` - 봇 시작 및 환영 메시지
-- `/bid <설정명>` - 지정된 설정으로 입찰 시작
-- `/status` - 현재 진행 상황 확인
-- `/strategy` - 가격 전략 설정
-- `/schedule` - 자동 실행 스케줄 설정
-- `/stop` - 진행 중인 작업 중지
-- `/history` - 최근 입찰 내역 조회
+### 오류 처리 우선순위
+1. 로그인 실패 → 사이트별 로그인 요구사항 확인
+2. 스크래핑 실패 → 셀렉터 변경 확인
+3. 입찰 실패 → 데이터 형식 및 로그인 상태 확인
 
-## 작업 흐름 표준
+### 코드 수정 시
+1. 항상 현재 코드 상태 확인 후 수정
+2. dryRun: true로 먼저 테스트
+3. 한 번에 하나의 기능만 수정
 
-### 통합 파이프라인 실행 순서
+## Prohibited Actions
 
-1. **설정 로드**: pricing_strategy.json에서 가격 조정 설정 읽기
-2. **링크 추출**: 각 사이트에서 상품 링크 수집
-3. **스크래핑**: 상품 정보 스크래핑 (코드, 색상, 사이즈, 가격)
-4. **가격 조정**: 설정된 할인율 적용하여 입찰가 계산
-5. **입찰 실행**: 조정된 가격으로 자동 입찰
-6. **결과 저장**: DB에 결과 저장 및 텔레그램 알림
+### 절대 금지
+- `C:\poison_final\logs` 이외의 경로에 로그 저장
+- 로그인이 필요없는 사이트에 로그인 강제
+- 사용자 동의 없이 shrimp 작업 삭제 또는 초기화
+- 한 번에 전체 파일 재작성 (섹션별로 나누어 처리)
 
-### 에러 처리
-
-- 각 단계별 try-except 블록 사용
-- 실패 시 상세 에러 로그 기록
-- 재시도 가능한 에러는 3회까지 재시도
-- 치명적 에러는 텔레그램으로 즉시 알림
-
-## 핵심 파일 상호작용 표준
-
-### 설정 파일 동기화
-
-- pricing_strategy.json 수정 시 반드시 DB의 pricing_strategies 테이블도 업데이트
-- schedule_config.json 수정 시 APScheduler 재시작 필요
-
-### 모듈 간 데이터 전달
-
-- 각 모듈은 표준화된 딕셔너리 형식으로 데이터 반환
-- 예: `{'status': 'success', 'data': [...], 'error': None}`
-
-## AI 의사결정 표준
-
-### 재시도 판단 기준
-
-1. **네트워크 에러**: 3회 재시도 (간격: 5초, 10초, 20초)
-2. **파싱 에러**: 1회 재시도 (다른 파싱 방법 시도)
-3. **인증 에러**: 재시도 없음, 사용자에게 알림
-
-### 가격 조정 우선순위
-
-1. 쿠폰 할인 적용
-2. 적립금/포인트 할인 적용
-3. 무신사 카드 프리미엄 적용 (조건 충족 시)
-4. 카드 캐시백 적용
-
-## 금지 사항
-
-### 절대 사용 금지
-
-- **GUI 라이브러리**: tkinter, PyQt, customtkinter 등
-- **하드코딩**: 설정값, 경로, 인증 정보 등
-- **동기 blocking**: time.sleep() 대신 asyncio.sleep() 사용
-- **print()**: 로깅 라이브러리 사용 (logging 모듈)
-
-### 피해야 할 패턴
-
-- 전역 변수 사용 (클래스 속성으로 대체)
-- 중복 코드 (공통 함수로 추출)
-- 긴 함수 (50줄 이상은 분리)
-- 매직 넘버 (상수로 정의)
-
-## 테스트 및 검증
-
-### 단위 테스트 대상
-
-- 가격 계산 로직
-- 데이터 파싱 로직
-- DB 연동 함수
-
-### 통합 테스트 시나리오
-
-- 전체 파이프라인 실행
-- 에러 발생 시 복구
-- 동시 실행 처리
-
-## 배포 및 운영
-
-### 환경 변수
-
-- `TELEGRAM_BOT_TOKEN`: 텔레그램 봇 토큰
-- `DB_PATH`: SQLite 데이터베이스 경로
-- `LOG_LEVEL`: 로깅 레벨 (DEBUG, INFO, WARNING, ERROR)
-
-### 로그 관리
-
-- 일별 로그 파일 생성
-- 30일 이상 된 로그는 자동 삭제
-- 에러 로그는 별도 파일에 저장
+### 주의 사항
+- ABC마트는 로그인 체크 로직 실행 금지
+- 4자리 사이즈 코드는 항상 필터링
+- edit_file_lines 사용 시 항상 dryRun: true 먼저
+- 파일 수정 전 해당 부분 라인 번호 재확인
