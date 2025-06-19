@@ -15,6 +15,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 import traceback
+from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
 
 # Selenium for link extraction
 try:
@@ -65,6 +66,20 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
+# ABC마트 계열 채널 정보
+ABC_MART_CHANNELS = {
+    'abcmart': {
+        'domain': 'abcmart',
+        'channel': '10001',
+        'name': 'ABC마트'
+    },
+    'grandstage': {
+        'domain': 'grandstage',
+        'channel': '10002',
+        'name': '그랜드스테이지'
+    }
+}
+
 
 class AutoBidding:
     """완전 자동화 입찰 클래스"""
@@ -86,7 +101,10 @@ class AutoBidding:
             "extraction": {
                 "max_scrolls": 10,
                 "wait_time": 3,
-                "max_links": 50
+                "max_links": 50,
+                "max_pages": 100,
+                "page_wait_time": 3,
+                "empty_page_threshold": 2
             },
             "pricing": {
                 "default_strategy": "basic"
@@ -112,6 +130,111 @@ class AutoBidding:
                 json.dump(default_config, f, ensure_ascii=False, indent=2)
                 
         return default_config
+    
+    def _build_page_url(self, base_url: str, page: int) -> str:
+        """
+        페이지 번호가 포함된 URL 생성
+        
+        Args:
+            base_url: 기본 URL (page 파라미터 있을 수도 없을 수도 있음)
+            page: 페이지 번호
+            
+        Returns:
+            page 파라미터가 설정된 새로운 URL
+        """
+        # URL 파싱
+        parsed = urlparse(base_url)
+        params = parse_qs(parsed.query)
+        
+        # page 파라미터 설정 (기존 값 덮어쓰기)
+        params['page'] = [str(page)]
+        
+        # URL 재구성
+        new_query = urlencode(params, doseq=True)
+        new_url = urlunparse((
+            parsed.scheme,
+            parsed.netloc,
+            parsed.path,
+            parsed.params,
+            new_query,
+            parsed.fragment
+        ))
+        
+        logger.debug(f"URL 생성: {new_url} (페이지 {page})")
+        return new_url
+    
+    def _build_channel_search_url(self, keyword: str, channel_info: dict, page: int = 1) -> str:
+        """
+        채널별 검색 URL 생성
+        
+        Args:
+            keyword: 검색 키워드
+            channel_info: 채널 정보 딕셔너리 (domain, channel, name 포함)
+            page: 페이지 번호 (기본값 1)
+            
+        Returns:
+            채널별 검색 URL
+        """
+        domain = channel_info['domain']
+        channel = channel_info['channel']
+        
+        # 채널별 URL 생성
+        search_url = (
+            f"https://{domain}.a-rt.com/display/search-word/result?"
+            f"ntab&smartSearchCheck=false&perPage=30&sort=point&"
+            f"dfltChnnlMv=&searchPageGubun=product&track=W0010&"
+            f"searchWord={keyword}&page={page}&channel={channel}&"
+            f"chnnlNo={channel}&tabGubun=total"
+        )
+        
+        logger.debug(f"{channel_info['name']} URL 생성: {search_url[:80]}...")
+        return search_url
+    
+    def _extract_links_from_page(self, site: str) -> List[str]:
+        """
+        현재 페이지에서 링크 추출
+        
+        Args:
+            site: 사이트 이름 (abcmart/musinsa)
+            
+        Returns:
+            추출된 링크 목록
+        """
+        links = []
+        
+        try:
+            if site == 'abcmart':
+                # ABC마트 링크 추출 로직
+                # 여러 선택자로 시도
+                selectors = [
+                    'a[href*="product?prdtNo="]',
+                    'a[href*="prdtNo="]',
+                    '.item-list a[href]',
+                    '.search-list-wrap a[href]',
+                    '.item_area a[href]',
+                    '.list_item a[href]'
+                ]
+                
+                for selector in selectors:
+                    elements = self.driver.find_elements(By.CSS_SELECTOR, selector)
+                    for elem in elements:
+                        href = elem.get_attribute('href')
+                        if href and 'prdtNo=' in href:
+                            # 상품 번호 추출
+                            match = re.search(r'prdtNo=(\d+)', href)
+                            if match:
+                                product_id = match.group(1)
+                                # 표준 형식으로 저장
+                                link = f"https://abcmart.a-rt.com/product?prdtNo={product_id}"
+                                if link not in links:
+                                    links.append(link)
+                
+            logger.debug(f"{site}에서 {len(links)}개 링크 추출")
+            
+        except Exception as e:
+            logger.error(f"페이지 링크 추출 오류: {e}")
+        
+        return links
     
     def run_auto_pipeline(self, site: str = "musinsa", keywords: Optional[List[str]] = None,
                          strategy: str = "basic") -> Dict[str, Any]:
@@ -254,16 +377,96 @@ class AutoBidding:
             else:
                 search_url = f"https://abcmart.a-rt.com/display/search-word/result?ntab&smartSearchCheck=false&perPage=30&sort=point&dfltChnnlMv=&searchPageGubun=product&track=W0010&searchWord={keyword}&page=1&channel=10001&chnnlNo=10001&tabGubun=total"
             
-            # 페이지 로드
-            self.driver.get(search_url)
-            time.sleep(self.config['extraction']['wait_time'])
-            
-            # 스크롤하면서 링크 수집
-            last_height = self.driver.execute_script("return document.body.scrollHeight")
-            
-            for i in range(self.config['extraction']['max_scrolls']):
-                # 링크 추출
-                if site == "musinsa":
+            # ABC마트는 페이지네이션, 무신사는 스크롤 방식
+            if site == 'abcmart':
+                # ABC마트 계열 페이지네이션 방식
+                max_pages = self.config['extraction'].get('max_pages', 100)
+                page_wait_time = self.config['extraction'].get('page_wait_time', 3)
+                empty_threshold = self.config['extraction'].get('empty_page_threshold', 2)
+                
+                logger.info(f"ABC마트 계열 크롤링 시작 - {len(ABC_MART_CHANNELS)}개 채널")
+                
+                # 각 채널별 수집 통계
+                channel_stats = {}
+                
+                # 채널별로 순회
+                for channel_key, channel_info in ABC_MART_CHANNELS.items():
+                    channel_links = []
+                    page = 1
+                    empty_page_count = 0
+                    
+                    logger.info(f"\n[{channel_info['name']}] 크롤링 시작 (최대 {max_pages}페이지)")
+                    
+                    while page <= max_pages:
+                        # 채널별 URL 생성
+                        page_url = self._build_channel_search_url(keyword, channel_info, page)
+                        
+                        # 페이지 로드
+                        self.driver.get(page_url)
+                        time.sleep(page_wait_time)
+                        
+                        # 링크 추출
+                        page_links_new = self._extract_links_from_page(site)
+                        
+                        if not page_links_new:
+                            empty_page_count += 1
+                            logger.info(f"[{channel_info['name']}] 페이지 {page}: 링크 없음 (빈 페이지 {empty_page_count}/{empty_threshold})")
+                            
+                            # 연속 빈 페이지 임계값 도달 시 종료
+                            if empty_page_count >= empty_threshold:
+                                logger.info(f"[{channel_info['name']}] 연속 {empty_page_count}개의 빈 페이지, 검색 종료")
+                                break
+                        else:
+                            empty_page_count = 0  # 리셋
+                            channel_links.extend(page_links_new)
+                            logger.info(f"[{channel_info['name']}] 페이지 {page}: {len(page_links_new)}개 링크 추출 (채널 누적 {len(channel_links)}개)")
+                        
+                        # 진행 상황 로깅 (10페이지마다)
+                        if page % 10 == 0:
+                            logger.info(f"[{channel_info['name']}] 진행 상황: {page}페이지 완료, {len(channel_links)}개 링크 수집")
+                        
+                        page += 1
+                    
+                    # 채널별 수집 완료
+                    # 채널 내 중복 제거
+                    channel_links_unique = list(set(channel_links))
+                    duplicates = len(channel_links) - len(channel_links_unique)
+                    
+                    channel_stats[channel_info['name']] = {
+                        'collected': len(channel_links),
+                        'unique': len(channel_links_unique),
+                        'duplicates': duplicates
+                    }
+                    logger.info(f"[{channel_info['name']}] 크롤링 완료: 총 {page-1}페이지, {len(channel_links)}개 링크 수집 (중복 제거 후 {len(channel_links_unique)}개, 중복 {duplicates}개)")
+                    
+                    # 전체 링크 목록에 추가 (중복 제거된 링크)
+                    links.extend(channel_links_unique)
+                
+                # 전체 통계 출력
+                logger.info("\n=== ABC마트 계열 크롤링 완료 ===")
+                total_collected = sum(stats['collected'] for stats in channel_stats.values())
+                total_unique_per_channel = sum(stats['unique'] for stats in channel_stats.values())
+                total_duplicates_per_channel = sum(stats['duplicates'] for stats in channel_stats.values())
+                
+                for channel_name, stats in channel_stats.items():
+                    logger.info(f"{channel_name}: 수집 {stats['collected']}개, 고유 {stats['unique']}개, 중복 {stats['duplicates']}개")
+                
+                logger.info(f"\n채널별 통계 합계:")
+                logger.info(f"- 총 수집: {total_collected}개")
+                logger.info(f"- 채널 내 중복 제거 후: {total_unique_per_channel}개")
+                logger.info(f"- 채널 내 중복: {total_duplicates_per_channel}개")
+                logger.info(f"\n전체 통합 결과: {len(links)}개 링크 (채널 간 중복 포함)")
+                
+            else:
+                # 무신사 스크롤 방식
+                self.driver.get(search_url)
+                time.sleep(self.config['extraction']['wait_time'])
+                
+                # 스크롤하면서 링크 수집
+                last_height = self.driver.execute_script("return document.body.scrollHeight")
+                
+                for i in range(self.config['extraction']['max_scrolls']):
+                    # 링크 추출
                     elements = self.driver.find_elements(By.CSS_SELECTOR, "a[href*='/products/']")
                     for elem in elements:
                         href = elem.get_attribute('href')
@@ -272,37 +475,16 @@ class AutoBidding:
                             if match:
                                 product_id = match.group(1)
                                 links.append(f"https://www.musinsa.com/products/{product_id}")
-                else:
-                    # ABC마트 링크 추출 로직
-                    # 여러 선택자로 시도
-                    selectors = [
-                        'a[href*="product?prdtNo="]',
-                        'a[href*="prdtNo="]',
-                        '.item-list a[href]',
-                        '.search-list-wrap a[href]'
-                    ]
                     
-                    for selector in selectors:
-                        elements = self.driver.find_elements(By.CSS_SELECTOR, selector)
-                        for elem in elements:
-                            href = elem.get_attribute('href')
-                            if href and 'prdtNo=' in href:
-                                # 상품 번호 추출
-                                match = re.search(r'prdtNo=(\d+)', href)
-                                if match:
-                                    product_id = match.group(1)
-                                    # 표준 형식으로 저장
-                                    links.append(f"https://abcmart.a-rt.com/product?prdtNo={product_id}")
-                
-                # 스크롤
-                self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-                time.sleep(2)
-                
-                # 높이 확인
-                new_height = self.driver.execute_script("return document.body.scrollHeight")
-                if new_height == last_height:
-                    break
-                last_height = new_height
+                    # 스크롤
+                    self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+                    time.sleep(2)
+                    
+                    # 높이 확인
+                    new_height = self.driver.execute_script("return document.body.scrollHeight")
+                    if new_height == last_height:
+                        break
+                    last_height = new_height
             
         except Exception as e:
             logger.error(f"링크 추출 오류: {e}")
