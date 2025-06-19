@@ -292,6 +292,18 @@ class UnifiedBidding:
                 logger.warning(f"누락된 필드: {missing_fields}")
         
         try:
+            # items 파라미터 타입 검증
+            if not isinstance(items, list):
+                error_msg = f"TypeError: items는 list 타입이어야 합니다. 받은 타입: {type(items).__name__}"
+                logger.error(error_msg)
+                raise TypeError(error_msg)
+            
+            if not items:
+                logger.warning("입찰할 아이템이 없습니다.")
+                return []
+            
+            logger.info(f"run_with_poison 호출 전 최종 확인 - 타입: {type(items)}, 개수: {len(items)}")
+            
             # AutoBiddingAdapter를 사용한 입찰 실행
             # Chrome 드라이버 경로 자동 탐색 사용
             adapter = AutoBiddingAdapter(

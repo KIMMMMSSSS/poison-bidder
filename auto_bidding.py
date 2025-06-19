@@ -432,6 +432,19 @@ class AutoBidding:
                 # AutoBiddingAdapter 사용
                 adapter = AutoBiddingAdapter()
                 
+                # items 파라미터 검증
+                if not isinstance(items, list):
+                    error_msg = f"TypeError: items는 list 타입이어야 합니다. 받은 타입: {type(items).__name__}"
+                    logger.error(error_msg)
+                    raise TypeError(error_msg)
+                
+                if not items:
+                    logger.warning("입찰할 아이템이 없습니다.")
+                    return []
+                
+                logger.info(f"run_with_poison 호출 전 items 확인 - 타입: {type(items)}, 개수: {len(items)}")
+                logger.debug(f"첫 번째 아이템 샘플: {items[0] if items else 'N/A'}")
+                
                 # 입찰 목록 준비 (나중에 포이즌 URL로 변환 필요)
                 bid_list = []
                 for item in items:
