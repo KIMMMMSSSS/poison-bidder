@@ -74,7 +74,8 @@ class UnifiedBidding:
             raise
     
     def run_pipeline(self, site: str = "musinsa", strategy_id: str = "basic", 
-                    exec_mode: str = "auto", process_mode: str = "sequential") -> Dict[str, Any]:
+                    exec_mode: str = "auto", process_mode: str = "sequential",
+                    web_scraping: bool = False, search_keyword: str = None) -> Dict[str, Any]:
         """
         전체 파이프라인 실행
         
@@ -83,12 +84,14 @@ class UnifiedBidding:
             strategy_id: 사용할 가격 전략 ID
             exec_mode: 실행 모드 ("auto" 또는 "manual")
             process_mode: 처리 방식 ("sequential" 또는 "parallel")
+            web_scraping: 웹 스크래핑 사용 여부 (기본값: False)
+            search_keyword: 검색 키워드 (web_scraping이 True일 때 사용)
             
         Returns:
             실행 결과 딕셔너리
         """
         start_time = datetime.now()
-        logger.info(f"파이프라인 시작: site={site}, strategy={strategy_id}")
+        logger.info(f"파이프라인 시작: site={site}, strategy={strategy_id}, web_scraping={web_scraping}")
         
         try:
             # 성능 측정을 위한 단계별 시간 기록
@@ -97,10 +100,19 @@ class UnifiedBidding:
             # 1. 링크 추출
             step_start = datetime.now()
             logger.info("[1/4] 링크 추출 시작...")
-            links = self._extract_links(site)
+            links = self._extract_links(site, web_scraping=web_scraping, search_keyword=search_keyword)
             self.results['links'] = links
             step_times['link_extraction'] = (datetime.now() - step_start).total_seconds()
             logger.info(f"추출된 링크 수: {len(links)} (소요시간: {step_times['link_extraction']:.2f}초)")
+            
+            # 링크가 없으면 중단
+            if not links:
+                logger.warning("추출된 링크가 없습니다. 파이프라인을 중단합니다.")
+                return {
+                    'status': 'error',
+                    'error': '추출된 링크가 없습니다',
+                    'timestamp': datetime.now().isoformat()
+                }
             
             # 2. 상품 정보 스크래핑
             step_start = datetime.now()
@@ -162,11 +174,78 @@ class UnifiedBidding:
                 'timestamp': datetime.now().isoformat()
             }
     
-    def _extract_links(self, site: str) -> List[str]:
-        """링크 추출"""
-        # 현재는 파일에서 읽는 방식으로 구현
-        # TODO: 실제 추출기 모듈과 연동
+    def _extract_links(self, site: str, web_scraping: bool = False, search_keyword: str = None) -> List[str]:
+        """
+        링크 추출
         
+        Args:
+            site: 대상 사이트 ("musinsa" 또는 "abcmart")
+            web_scraping: 웹 스크래핑 사용 여부 (기본값: False - 파일 읽기)
+            search_keyword: 검색 키워드 (web_scraping이 True일 때 사용)
+            
+        Returns:
+            추출된 링크 리스트
+        """
+        # 웹 스크래핑 모드
+        if web_scraping:
+            if site == "abcmart":
+                logger.info(f"ABC마트 웹 스크래핑 모드: 검색어='{search_keyword}'")
+                
+                if not search_keyword:
+                    logger.error("웹 스크래핑 모드에서는 search_keyword가 필요합니다.")
+                    return []
+                
+                try:
+                    # poison_bidder_wrapper_v2 import
+                    from poison_bidder_wrapper_v2 import PoizonBidderWrapperV2
+                    
+                    # wrapper 인스턴스 생성
+                    wrapper = PoizonBidderWrapperV2()
+                    
+                    # ABC마트 링크 추출 실행
+                    start_time = datetime.now()
+                    links = wrapper.extract_abcmart_links(
+                        search_keyword=search_keyword,
+                        max_pages=10  # 최대 10페이지까지 검색
+                    )
+                    extraction_time = (datetime.now() - start_time).total_seconds()
+                    
+                    logger.info(f"ABC마트 링크 추출 완료: {len(links)}개 (소요시간: {extraction_time:.2f}초)")
+                    
+                    # 추출된 링크를 JSON 파일로 저장
+                    if links:
+                        output_dir = Path("output")
+                        output_dir.mkdir(exist_ok=True)
+                        
+                        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                        output_file = output_dir / f"abcmart_links_{search_keyword}_{timestamp}.json"
+                        
+                        with open(output_file, 'w', encoding='utf-8') as f:
+                            json.dump({
+                                "site": "abcmart",
+                                "search_keyword": search_keyword,
+                                "extraction_time": extraction_time,
+                                "total_count": len(links),
+                                "links": links,
+                                "timestamp": datetime.now().isoformat()
+                            }, f, ensure_ascii=False, indent=2)
+                        
+                        logger.info(f"링크 저장 완료: {output_file}")
+                    
+                    return links
+                    
+                except ImportError as e:
+                    logger.error(f"poison_bidder_wrapper_v2 import 실패: {e}")
+                    return []
+                except Exception as e:
+                    logger.error(f"ABC마트 웹 스크래핑 실패: {e}")
+                    logger.error(traceback.format_exc())
+                    return []
+            else:
+                logger.warning(f"{site}는 아직 웹 스크래핑을 지원하지 않습니다.")
+                return []
+        
+        # 기존 파일 읽기 방식 (하위 호환성 유지)
         links_file = Path(f"input/{site}_links.txt")
         if not links_file.exists():
             logger.warning(f"링크 파일을 찾을 수 없습니다: {links_file}")
@@ -425,8 +504,16 @@ def main():
                         help='처리 방식')
     parser.add_argument('--debug', action='store_true',
                         help='디버그 모드 활성화')
+    parser.add_argument('--web-scraping', action='store_true',
+                        help='웹 스크래핑 모드 활성화 (ABC마트 지원)')
+    parser.add_argument('--search-keyword', type=str,
+                        help='검색 키워드 (웹 스크래핑 모드에서 사용)')
     
     args = parser.parse_args()
+    
+    # 웹 스크래핑 모드 검증
+    if args.web_scraping and not args.search_keyword:
+        parser.error("웹 스크래핑 모드에서는 --search-keyword가 필요합니다.")
     
     # 실행
     bidder = UnifiedBidding(debug=args.debug)
@@ -434,7 +521,9 @@ def main():
         site=args.site,
         strategy_id=args.strategy,
         exec_mode=args.mode,
-        process_mode=args.process
+        process_mode=args.process,
+        web_scraping=args.web_scraping,
+        search_keyword=args.search_keyword
     )
     
     # 결과 출력
