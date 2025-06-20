@@ -39,6 +39,14 @@ except ImportError:
     LOGIN_MANAGER_AVAILABLE = False
     print("로그인 관리자를 사용할 수 없습니다.")
 
+# 무신사 팝업 처리 import
+try:
+    from musinsa_scraper_improved import enhanced_close_musinsa_popup
+    MUSINSA_POPUP_HANDLER_AVAILABLE = True
+except ImportError:
+    MUSINSA_POPUP_HANDLER_AVAILABLE = False
+    print("무신사 팝업 처리기를 사용할 수 없습니다.")
+
 # 포이즌 통합 입찰 import
 try:
     from poison_integrated_bidding import AutoBiddingAdapter
@@ -83,6 +91,101 @@ ABC_MART_CHANNELS = {
     }
 }
 
+# 사이트별 링크 추출 셀렉터
+LINK_SELECTORS = {
+    'musinsa': [
+        'a[href*="/products/"]',
+        'a[href*="/app/goods/"]',
+        'a[href*="/goods/"]',
+        '.list-item__link',
+        '.goods-list__link',
+        '[class*="product"] a[href*="/products/"]'
+    ],
+    'abcmart': [
+        'a[href*="product?prdtNo="]',
+        'a[href*="prdtNo="]',
+        '.item-list a[href]',
+        '.search-list-wrap a[href]',
+        '.item_area a[href]',
+        '.list_item a[href]',
+        '.product-list a[href*="prdtNo"]',
+        '[class*="product"] a[href*="prdtNo"]'
+    ]
+}
+
+def is_valid_product_link(link: str, site: str) -> bool:
+    """
+    상품 링크의 유효성 검증
+    
+    Args:
+        link: 검증할 링크
+        site: 사이트 이름 (musinsa/abcmart)
+        
+    Returns:
+        bool: 유효한 링크인지 여부
+    """
+    try:
+        if not link or not link.startswith('http'):
+            return False
+            
+        if site == 'musinsa':
+            # 무신사 상품 링크 패턴 확인
+            if not re.search(r'musinsa\.com/(products|app/goods|goods)/\d+', link):
+                return False
+            # 제외할 패턴 (리뷰, 이미지 등)
+            if any(pattern in link for pattern in ['/review/', '/image/', '/comment/', '#']):
+                return False
+                
+        elif site == 'abcmart':
+            # ABC마트 상품 링크 패턴 확인
+            if not re.search(r'a-rt\.com/.*prdtNo=\d+', link):
+                return False
+            # 제외할 패턴
+            if any(pattern in link for pattern in ['/review/', '/qna/', '/comment/', '#']):
+                return False
+                
+        return True
+        
+    except Exception as e:
+        logger.debug(f"링크 유효성 검증 오류 ({link}): {e}")
+        return False
+
+def normalize_product_link(link: str, site: str, channel_info: Dict[str, str] = None) -> str:
+    """
+    상품 링크 정규화
+    
+    Args:
+        link: 정규화할 링크
+        site: 사이트 이름 (musinsa/abcmart)
+        channel_info: 채널 정보 (ABC마트 계열)
+        
+    Returns:
+        str: 정규화된 링크
+    """
+    try:
+        if site == 'musinsa':
+            # 무신사 상품 ID 추출
+            match = re.search(r'/(?:products|app/goods|goods)/(\d+)', link)
+            if match:
+                product_id = match.group(1)
+                return f"https://www.musinsa.com/products/{product_id}"
+                
+        elif site == 'abcmart':
+            # ABC마트 상품 번호 추출
+            match = re.search(r'prdtNo=(\d+)', link)
+            if match:
+                product_id = match.group(1)
+                if channel_info and 'domain' in channel_info:
+                    domain = channel_info['domain']
+                    return f"https://{domain}.a-rt.com/product?prdtNo={product_id}"
+                else:
+                    return f"https://abcmart.a-rt.com/product?prdtNo={product_id}"
+                    
+    except Exception as e:
+        logger.debug(f"링크 정규화 오류 ({link}): {e}")
+        
+    return link
+
 
 class AutoBidding:
     """완전 자동화 입찰 클래스"""
@@ -102,12 +205,14 @@ class AutoBidding:
                 "abcmart": ["운동화", "스니커즈"]
             },
             "extraction": {
-                "max_scrolls": 10,
+                "max_scrolls": 20,
+                "scroll_steps": 5,
                 "wait_time": 3,
                 "max_links": 50,
                 "max_pages": 100,
                 "page_wait_time": 3,
-                "empty_page_threshold": 2
+                "empty_page_threshold": 2,
+                "popup_check_interval": 3
             },
             "pricing": {
                 "default_strategy": "basic"
@@ -205,42 +310,55 @@ class AutoBidding:
             추출된 링크 목록
         """
         links = []
+        extracted_count = 0
+        invalid_count = 0
+        duplicate_count = 0
         
         try:
-            if site == 'abcmart':
-                # ABC마트 링크 추출 로직
-                # 여러 선택자로 시도
-                selectors = [
-                    'a[href*="product?prdtNo="]',
-                    'a[href*="prdtNo="]',
-                    '.item-list a[href]',
-                    '.search-list-wrap a[href]',
-                    '.item_area a[href]',
-                    '.list_item a[href]'
-                ]
-                
-                for selector in selectors:
+            # 사이트별 셀렉터 가져오기
+            selectors = LINK_SELECTORS.get(site, [])
+            
+            for selector in selectors:
+                try:
                     elements = self.driver.find_elements(By.CSS_SELECTOR, selector)
+                    
                     for elem in elements:
                         href = elem.get_attribute('href')
-                        if href and 'prdtNo=' in href:
-                            # 상품 번호 추출
-                            match = re.search(r'prdtNo=(\d+)', href)
-                            if match:
-                                product_id = match.group(1)
-                                # 표준 형식으로 저장 (채널 정보가 있으면 해당 도메인 사용)
-                                if channel_info:
-                                    domain = channel_info['domain']
-                                    link = f"https://{domain}.a-rt.com/product?prdtNo={product_id}"
-                                else:
-                                    link = f"https://abcmart.a-rt.com/product?prdtNo={product_id}"
-                                if link not in links:
-                                    links.append(link)
-                
-            logger.debug(f"{site}에서 {len(links)}개 링크 추출")
+                        if not href:
+                            continue
+                            
+                        extracted_count += 1
+                        
+                        # 링크 유효성 검증
+                        if not is_valid_product_link(href, site):
+                            invalid_count += 1
+                            continue
+                        
+                        # 링크 정규화
+                        normalized_link = normalize_product_link(href, site, channel_info)
+                        
+                        # 중복 체크
+                        if normalized_link not in links:
+                            links.append(normalized_link)
+                        else:
+                            duplicate_count += 1
+                            
+                except Exception as e:
+                    logger.debug(f"셀렉터 {selector} 처리 중 오류: {e}")
+                    continue
+            
+            # 통계 로깅
+            valid_count = len(links)
+            logger.info(f"{site} 링크 추출 통계: 총 {extracted_count}개 추출, "
+                       f"유효 {valid_count}개, 무효 {invalid_count}개, 중복 {duplicate_count}개")
+            
+            # 추가 디버그 정보
+            if valid_count == 0 and extracted_count > 0:
+                logger.warning(f"{site}에서 추출한 링크가 모두 무효합니다. 셀렉터 확인 필요")
             
         except Exception as e:
             logger.error(f"페이지 링크 추출 오류: {e}")
+            logger.error(traceback.format_exc())
         
         return links
     
@@ -640,29 +758,128 @@ class AutoBidding:
                 self.driver.get(search_url)
                 time.sleep(self.config['extraction']['wait_time'])
                 
-                # 스크롤하면서 링크 수집
+                # 무신사 팝업 처리
+                if site == "musinsa" and MUSINSA_POPUP_HANDLER_AVAILABLE:
+                    try:
+                        popup_handled = enhanced_close_musinsa_popup(self.driver, worker_id=None)
+                        if popup_handled:
+                            logger.info("무신사 팝업 처리 성공")
+                        else:
+                            logger.debug("무신사 팝업이 없습니다")
+                    except Exception as e:
+                        logger.warning(f"무신사 팝업 처리 중 예외 (무시하고 계속): {e}")
+                
+                # 스크롤하면서 링크 수집 - set() 사용으로 자동 중복 제거
+                musinsa_links = set()  # set으로 초기화
                 last_height = self.driver.execute_script("return document.body.scrollHeight")
+                scroll_count = 0
+                
+                # 팝업 체크 간격 설정
+                popup_check_interval = self.config['extraction'].get('popup_check_interval', 3)
+                logger.debug(f"팝업 체크 간격: {popup_check_interval}회마다")
                 
                 for i in range(self.config['extraction']['max_scrolls']):
-                    # 링크 추출
-                    elements = self.driver.find_elements(By.CSS_SELECTOR, "a[href*='/products/']")
-                    for elem in elements:
-                        href = elem.get_attribute('href')
-                        if href and '/products/' in href:
-                            match = re.search(r'/products/(\d+)', href)
-                            if match:
-                                product_id = match.group(1)
-                                links.append(f"https://www.musinsa.com/products/{product_id}")
+                    # Window 상태 체크 (멀티프로세싱 환경에서 window가 닫힐 수 있음)
+                    try:
+                        current_handles = self.driver.window_handles
+                        if not current_handles:
+                            logger.warning("브라우저 window가 닫혔습니다. 스크롤 중단")
+                            break
+                        # 현재 window로 전환 시도
+                        self.driver.switch_to.window(current_handles[0])
+                    except Exception as e:
+                        logger.error(f"Window 상태 체크 실패: {e}")
+                        break
                     
-                    # 스크롤
-                    self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-                    time.sleep(2)
+                    # 스크롤 전 현재 DOM의 상휸 수 확인
+                    products_before_scroll = len(self.driver.find_elements(By.CSS_SELECTOR, "a[href*='/products/']"))
+                    logger.debug(f"스크롤 전 DOM 상품 수: {products_before_scroll}개")
+                    
+                    # 간헐적 팝업 처리 (첫 스크롤 제외)
+                    if i > 0 and i % popup_check_interval == 0:
+                        if site == "musinsa" and MUSINSA_POPUP_HANDLER_AVAILABLE:
+                            try:
+                                popup_handled = enhanced_close_musinsa_popup(self.driver, worker_id=None)
+                                if popup_handled:
+                                    logger.info(f"스크롤 중 팝업 처리 성공 (스크롤 {i+1})")
+                                else:
+                                    logger.debug(f"스크롤 {i+1}: 팝업 없음")
+                            except Exception as e:
+                                logger.debug(f"스크롤 중 팝업 처리 예외 (무시): {e}")
+                    
+                    # 점진적 스크롤 (5단계)
+                    scroll_steps = self.config['extraction'].get('scroll_steps', 5)
+                    logger.debug(f"점진적 스크롤 시작 ({scroll_steps}단계)")
+                    
+                    for step in range(scroll_steps):
+                        # window.innerHeight의 80%씩 스크롤
+                        self.driver.execute_script("window.scrollBy(0, window.innerHeight * 0.8);")
+                        time.sleep(0.5)  # 각 단계마다 0.5초 대기
+                        
+                        # 중간 단계 로깅 (디버그 레벨)
+                        if step == scroll_steps - 1:
+                            logger.debug(f"  └─ 스크롤 {step + 1}/{scroll_steps} 완료")
+                    
+                    # 동적 대기: 새 상품이 로드될 때까지 대기 (최대 5초)
+                    try:
+                        wait = WebDriverWait(self.driver, 5)
+                        wait.until(lambda driver: 
+                            len(driver.find_elements(By.CSS_SELECTOR, "a[href*='/products/']")) > products_before_scroll
+                        )
+                        products_after_scroll = len(self.driver.find_elements(By.CSS_SELECTOR, "a[href*='/products/']"))
+                        logger.debug(f"새 상품 로드 완료: {products_after_scroll - products_before_scroll}개 추가")
+                    except:
+                        # 타임아웃 시에도 계속 진행
+                        logger.debug("새 상품 로드 대기 타임아웃 (5초)")
+                    
+                    scroll_count += 1
+                    
+                    # 로드가 완료된 후 링크 추출
+                    page_links = self._extract_links_from_page(site)
+                    
+                    # 새로운 링크 수 계산 및 추가
+                    before_count = len(musinsa_links)
+                    musinsa_links.update(page_links)  # set의 update 메서드 사용
+                    new_links_count = len(musinsa_links) - before_count
+                    
+                    # 상세 로깅
+                    if new_links_count > 0:
+                        logger.info(f"스크롤 {i+1}/{self.config['extraction']['max_scrolls']}: "
+                                  f"{new_links_count}개 새 링크 발견 (총 {len(musinsa_links)}개)")
+                    else:
+                        logger.debug(f"스크롤 {i+1}/{self.config['extraction']['max_scrolls']}: 새 링크 없음")
+                    
+                    # status_callback 호출 (텔레그램 봇 진행률 업데이트)
+                    if status_callback:
+                        # 스크롤 진행률 계산 (링크 추출 단계 내에서의 세부 진행률)
+                        stage_progress = status_constants.calculate_stage_progress(
+                            status_constants.STAGE_LINK_EXTRACTING,
+                            i + 1,
+                            self.config['extraction']['max_scrolls']
+                        )
+                        status_callback(
+                            status_constants.STAGE_LINK_EXTRACTING,
+                            stage_progress,
+                            f"스크롤 {i+1}/{self.config['extraction']['max_scrolls']}: "
+                            f"{len(musinsa_links)}개 링크 수집 중...",
+                            {
+                                "current_scroll": i + 1,
+                                "total_scrolls": self.config['extraction']['max_scrolls'],
+                                "links_found": len(musinsa_links),
+                                "new_links": new_links_count
+                            }
+                        )
                     
                     # 높이 확인
                     new_height = self.driver.execute_script("return document.body.scrollHeight")
                     if new_height == last_height:
+                        logger.info(f"페이지 끝 도달 (스크롤 {scroll_count}회, 총 {len(musinsa_links)}개 링크)")
                         break
                     last_height = new_height
+                
+                # 최종 통계 및 list로 변환하여 병합
+                logger.info(f"무신사 링크 추출 완료: 총 {len(musinsa_links)}개 고유 링크 수집")
+                links.extend(list(musinsa_links))  # set을 list로 변환하여 추가
             
         except Exception as e:
             logger.error(f"링크 추출 오류: {e}")
@@ -754,9 +971,30 @@ class AutoBidding:
                     })
                     continue
                 
+                # Window 상태 체크 (스크래핑 시작 전)
+                try:
+                    current_handles = self.driver.window_handles
+                    if not current_handles:
+                        logger.warning(f"브라우저 window가 닫혔습니다. 스크래핑 중단 ({i+1}/{len(links)})")
+                        break
+                    # 현재 window로 전환 시도
+                    self.driver.switch_to.window(current_handles[0])
+                except Exception as e:
+                    logger.error(f"Window 상태 체크 실패: {e}")
+                    break
+                
                 # 실제 스크래핑
                 self.driver.get(link)
                 time.sleep(self.config['scraping']['delay'])
+                
+                # 무신사 팝업 처리 (각 상품 페이지)
+                if site == "musinsa" and MUSINSA_POPUP_HANDLER_AVAILABLE:
+                    try:
+                        popup_handled = enhanced_close_musinsa_popup(self.driver, worker_id=None)
+                        if popup_handled:
+                            logger.debug(f"무신사 팝업 처리 성공 (상품 {i+1}/{len(links)})")
+                    except Exception as e:
+                        logger.debug(f"무신사 팝업 처리 예외 (무시): {e}")
                 
                 item = {'link': link}
                 
