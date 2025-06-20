@@ -584,46 +584,68 @@ class BiddingBot:
                 
                 # 결과 메시지
                 if result['status'] == 'success':
-                    # 성공 메시지
+                    # 성공 메시지 개선
                     success_msg = (
                         f"✅ **자동화 입찰 완료!**\n\n"
-                        f"📊 **결과 요약**\n"
+                        f"⚙️ **사용자 설정**\n"
                         f"├ 🔍 검색 키워드: {', '.join(keywords)}\n"
                     )
                     
                     # 커스텀 설정이 있으면 표시
                     if custom_discount_rate is not None:
                         success_msg += f"├ 💰 적용 할인율: {custom_discount_rate}%\n"
+                    else:
+                        success_msg += f"├ 💰 적용 할인율: 기본 전략\n"
+                        
                     if custom_min_profit is not None:
-                        success_msg += f"├ 💵 설정 최소 수익: {custom_min_profit:,}원\n"
+                        success_msg += f"└ 💵 최소 수익 기준: {custom_min_profit:,}원\n\n"
+                    else:
+                        success_msg += f"└ 💵 최소 수익 기준: 설정 없음\n\n"
                     
+                    # 수집 및 처리 결과
                     success_msg += (
+                        f"📊 **처리 결과**\n"
                         f"├ 🔗 수집된 링크: {result.get('total_links', 0)}개\n"
-                        f"├ 📦 처리된 상품: {result.get('total_items', 0)}개\n"
+                        f"├ 📦 분석된 상품: {result.get('total_items', 0)}개\n"
                         f"├ ✅ 성공한 입찰: {result.get('successful_bids', 0)}개\n"
+                        f"├ ❌ 실패한 입찰: {result.get('total_items', 0) - result.get('successful_bids', 0)}개\n"
                         f"└ ⏱️ 소요 시간: {result.get('execution_time', 0):.1f}초\n\n"
-                        f"💾 결과는 `output` 폴더에 저장되었습니다."
                     )
+                    
+                    # 재무 정보 추가 (예상)
+                    successful_bids = result.get('successful_bids', 0)
+                    if successful_bids > 0:
+                        success_msg += (
+                            f"💰 **예상 수익 정보**\n"
+                            f"├ 평균 할인율: {custom_discount_rate if custom_discount_rate else '전략별 상이'}%\n"
+                            f"├ 성공 입찰 수: {successful_bids}개\n"
+                            f"└ 예상 수익률: 할인율 × 판매 성공 시\n\n"
+                        )
+                    
+                    success_msg += f"💾 상세 결과는 `output` 폴더에 저장되었습니다."
                     
                     await query.message.chat.send_message(
                         success_msg,
                         parse_mode='Markdown'
                     )
                     
-                    # 입찰 성공률 계산
+                    # 입찰 성공률 계산 및 평가
                     if result.get('total_items', 0) > 0:
                         success_rate = (result.get('successful_bids', 0) / result.get('total_items', 0)) * 100
                         
-                        # 성공률에 따른 이모지
+                        # 성공률에 따른 평가 메시지
                         if success_rate >= 80:
-                            emoji = "🎯"
+                            rate_msg = f"🎯 **우수한 성공률**: {success_rate:.1f}%\n"
+                            rate_msg += "대부분의 상품에서 입찰에 성공했습니다!"
                         elif success_rate >= 50:
-                            emoji = "👍"
+                            rate_msg = f"👍 **양호한 성공률**: {success_rate:.1f}%\n"
+                            rate_msg += "절반 이상의 상품에서 입찰에 성공했습니다."
                         else:
-                            emoji = "⚠️"
+                            rate_msg = f"⚠️ **개선 필요**: {success_rate:.1f}%\n"
+                            rate_msg += "할인율이나 최소 수익 설정을 조정해보세요."
                         
                         await query.message.chat.send_message(
-                            f"{emoji} 입찰 성공률: {success_rate:.1f}%",
+                            rate_msg,
                             parse_mode='Markdown'
                         )
                 else:
