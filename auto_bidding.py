@@ -363,7 +363,9 @@ class AutoBidding:
         return links
     
     def run_auto_pipeline(self, site: str = "musinsa", keywords: Optional[List[str]] = None,
-                         strategy: str = "basic", status_callback=None) -> Dict[str, Any]:
+                         strategy: str = "basic", status_callback=None,
+                         custom_discount_rate: Optional[float] = None,
+                         custom_min_profit: Optional[int] = None) -> Dict[str, Any]:
         """
         완전 자동화 파이프라인 실행
         
@@ -371,9 +373,18 @@ class AutoBidding:
             site: 대상 사이트
             keywords: 검색 키워드 (None이면 설정 파일에서 읽음)
             strategy: 가격 전략
+            status_callback: 상태 업데이트 콜백 함수
+            custom_discount_rate: 커스텀 할인율 (1-30 범위, None이면 strategy 사용)
+            custom_min_profit: 커스텀 최소 수익 (None이면 기본값 사용)
         """
         start_time = datetime.now()
         logger.info(f"자동화 파이프라인 시작: {site}")
+        
+        # 커스텀 설정 로깅
+        if custom_discount_rate is not None:
+            logger.info(f"커스텀 할인율: {custom_discount_rate}%")
+        if custom_min_profit is not None:
+            logger.info(f"커스텀 최소 수익: {custom_min_profit:,}원")
         
         # 초기화 상태 콜백
         if status_callback:
@@ -489,7 +500,7 @@ class AutoBidding:
                     f"{len(items)}개 상품의 최적 가격을 계산합니다."
                 )
             
-            adjusted_items = self._apply_pricing_strategy(items, strategy)
+            adjusted_items = self._apply_pricing_strategy(items, strategy, custom_discount_rate)
             self.results['adjusted_items'] = adjusted_items
             
             # 가격 계산 완료 콜백
@@ -511,7 +522,7 @@ class AutoBidding:
                     f"{len(adjusted_items)}개 상품 입찰을 시작합니다."
                 )
             
-            bid_results = self._execute_auto_bidding(site, adjusted_items, status_callback)
+            bid_results = self._execute_auto_bidding(site, adjusted_items, status_callback, custom_min_profit, custom_discount_rate)
             self.results['bid_results'] = bid_results
             
             # 입찰 완료 콜백
@@ -540,7 +551,9 @@ class AutoBidding:
                         "total_links": len(unique_links),
                         "total_items": len(items),
                         "successful_bids": successful_bids,
-                        "execution_time": execution_time
+                        "execution_time": execution_time,
+                        "custom_discount_rate": custom_discount_rate,
+                        "custom_min_profit": custom_min_profit
                     }
                 )
             
@@ -1113,7 +1126,8 @@ class AutoBidding:
         
         return items
     
-    def _apply_pricing_strategy(self, items: List[Dict[str, Any]], strategy: str) -> List[Dict[str, Any]]:
+    def _apply_pricing_strategy(self, items: List[Dict[str, Any]], strategy: str,
+                               custom_discount_rate: Optional[float] = None) -> List[Dict[str, Any]]:
         """가격 전략 적용"""
         # 간단한 가격 조정 로직
         strategies = {
@@ -1122,7 +1136,12 @@ class AutoBidding:
             'premium': 0.85     # 15% 할인
         }
         
-        discount_rate = strategies.get(strategy, 0.95)
+        # 커스텀 할인율이 있으면 사용, 없으면 strategy 사용
+        if custom_discount_rate is not None:
+            discount_rate = 1 - (custom_discount_rate / 100)  # 퍼센트를 비율로 변환
+            logger.info(f"커스텀 할인율 적용: {custom_discount_rate}% (비율: {discount_rate})")
+        else:
+            discount_rate = strategies.get(strategy, 0.95)
         
         adjusted_items = []
         for item in items:
@@ -1134,9 +1153,18 @@ class AutoBidding:
         
         return adjusted_items
     
-    def _execute_auto_bidding(self, site: str, items: List[Dict[str, Any]], status_callback=None) -> List[Dict[str, Any]]:
+    def _execute_auto_bidding(self, site: str, items: List[Dict[str, Any]], status_callback=None,
+                             custom_min_profit: Optional[int] = None, custom_discount_rate: Optional[float] = None) -> List[Dict[str, Any]]:
         """자동 입찰 실행"""
         results = []
+        
+        # 커스텀 최소 수익 로깅
+        if custom_min_profit is not None:
+            logger.info(f"커스텀 최소 수익 적용: {custom_min_profit:,}원")
+        
+        # 커스텀 할인율 로깅
+        if custom_discount_rate is not None:
+            logger.info(f"커스텀 할인율 적용: {custom_discount_rate}%")
         
         # 포이즌 통합 입찰 사용
         if POISON_LOGIN_AVAILABLE:
@@ -1168,7 +1196,8 @@ class AutoBidding:
                     })
                 
                 # 포이즌로 입찰 실행
-                bid_result = adapter.run_with_poison(items, status_callback)
+                discount_rate = custom_discount_rate if custom_discount_rate is not None else 0
+                bid_result = adapter.run_with_poison(items, status_callback, discount_rate=discount_rate)
                 
                 # 결과 변환
                 if bid_result['status'] == 'success':

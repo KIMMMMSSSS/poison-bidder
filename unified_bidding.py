@@ -17,6 +17,14 @@ import traceback
 # poison_integrated_bidding import 추가
 from poison_integrated_bidding import AutoBiddingAdapter
 
+# 무신사 팝업 처리 import
+try:
+    from musinsa_scraper_improved import enhanced_close_musinsa_popup
+    MUSINSA_POPUP_HANDLER_AVAILABLE = True
+except ImportError:
+    MUSINSA_POPUP_HANDLER_AVAILABLE = False
+    print("무신사 팝업 처리기를 사용할 수 없습니다.")
+
 # 로깅 설정
 log_dir = Path("logs")
 log_dir.mkdir(exist_ok=True)
@@ -241,8 +249,89 @@ class UnifiedBidding:
                     logger.error(f"ABC마트 웹 스크래핑 실패: {e}")
                     logger.error(traceback.format_exc())
                     return []
+            elif site == "musinsa":
+                logger.info(f"무신사 웹 스크래핑 모드: 검색어='{search_keyword}'")
+                
+                if not search_keyword:
+                    logger.error("웹 스크래핑 모드에서는 search_keyword가 필요합니다.")
+                    return []
+                
+                try:
+                    # poison_bidder_wrapper_v2를 사용하여 무신사 스크래핑
+                    from poison_bidder_wrapper_v2 import PoizonBidderWrapperV2
+                    
+                    # wrapper 인스턴스 생성
+                    wrapper = PoizonBidderWrapperV2()
+                    
+                    # 무신사 로그인 확인 (팝업 처리 포함)
+                    if not wrapper.ensure_musinsa_login():
+                        logger.error("무신사 로그인 실패")
+                        return []
+                    
+                    # 무신사 링크 추출 실행 (팝업 처리는 ensure_musinsa_login에서 처리됨)
+                    logger.info(f"무신사 링크 추출 시작: 검색어='{search_keyword}'")
+                    
+                    # Selenium 사용하여 직접 검색 (로그인 매니저의 드라이버 사용)
+                    driver = wrapper.musinsa_login_mgr.driver
+                    
+                    # 무신사 검색 페이지 접속
+                    search_url = f"https://www.musinsa.com/search/goods?keyword={search_keyword}"
+                    driver.get(search_url)
+                    import time
+                    time.sleep(3)
+                    
+                    # 검색 페이지에서도 팝업 처리 (필요시)
+                    if MUSINSA_POPUP_HANDLER_AVAILABLE:
+                        try:
+                            popup_handled = enhanced_close_musinsa_popup(driver, worker_id=None)
+                            if popup_handled:
+                                logger.info("무신사 검색 페이지 팝업 처리 성공")
+                        except Exception as e:
+                            logger.debug(f"무신사 검색 페이지 팝업 처리 예외: {e}")
+                    
+                    # 링크 추출
+                    links = []
+                    from selenium.webdriver.common.by import By
+                    elements = driver.find_elements(By.CSS_SELECTOR, "a[href*='/products/']")
+                    for elem in elements:
+                        href = elem.get_attribute('href')
+                        if href and '/products/' in href:
+                            links.append(href)
+                    
+                    # 중복 제거
+                    links = list(set(links))
+                    logger.info(f"무신사 링크 추출 완료: {len(links)}개")
+                    
+                    # 추출된 링크를 JSON 파일로 저장
+                    if links:
+                        output_dir = Path("output")
+                        output_dir.mkdir(exist_ok=True)
+                        
+                        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                        output_file = output_dir / f"musinsa_links_{search_keyword}_{timestamp}.json"
+                        
+                        with open(output_file, 'w', encoding='utf-8') as f:
+                            json.dump({
+                                "site": "musinsa",
+                                "search_keyword": search_keyword,
+                                "total_count": len(links),
+                                "links": links,
+                                "timestamp": datetime.now().isoformat()
+                            }, f, ensure_ascii=False, indent=2)
+                        
+                        logger.info(f"링크 저장 완료: {output_file}")
+                    
+                    return links
+                    
+                except ImportError as e:
+                    logger.error(f"poison_bidder_wrapper_v2 import 실패: {e}")
+                    return []
+                except Exception as e:
+                    logger.error(f"무신사 웹 스크래핑 실패: {e}")
+                    logger.error(traceback.format_exc())
+                    return []
             else:
-                logger.warning(f"{site}는 아직 웹 스크래핑을 지원하지 않습니다.")
+                logger.warning(f"{site}는 웹 스크래핑을 지원하지 않습니다.")
                 return []
         
         # 기존 파일 읽기 방식 (하위 호환성 유지)

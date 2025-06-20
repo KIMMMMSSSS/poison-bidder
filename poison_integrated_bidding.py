@@ -160,7 +160,7 @@ class AutoBiddingAdapter:
         self.worker_count = worker_count
         self.poison_bidder = None
         
-    def run_with_poison(self, items: List[Dict[str, Any]], status_callback=None) -> Dict[str, Any]:
+    def run_with_poison(self, items: List[Dict[str, Any]], status_callback=None, discount_rate: float = 0) -> Dict[str, Any]:
         """
         포이즌으로 입찰 실행 - 실제 0923_fixed_multiprocess_cookie_v2.py 사용
         
@@ -242,7 +242,7 @@ class AutoBiddingAdapter:
                 )
             
             # 입찰 실행 (unified_items 파라미터 사용)
-            result = self.poison_bidder.run_bidding(unified_items=items)
+            result = self.poison_bidder.run_bidding(unified_items=items, discount_rate=discount_rate)
             
             # 결과 로깅
             success_count = result.get('success', 0)

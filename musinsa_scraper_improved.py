@@ -204,7 +204,7 @@ def enhanced_close_musinsa_popup(driver, worker_id=None):
                         mutation.addedNodes.forEach(function(node) {
                             if (node.nodeType === 1) {  // Element node
                                 // 팝업 관련 클래스 체크
-                                const popupClasses = ['modal', 'popup', 'layer-popup', 'overlay', 'modal-backdrop'];
+                                const popupClasses = ['modal', 'popup', 'layer-popup', 'overlay', 'modal-backdrop', 'dim', 'dimmed'];
                                 const hasPopupClass = popupClasses.some(cls => 
                                     node.classList && node.classList.contains(cls)
                                 );
@@ -214,14 +214,31 @@ def enhanced_close_musinsa_popup(driver, worker_id=None):
                                 const zIndex = parseInt(style.zIndex);
                                 const isHighZIndex = zIndex > 9999;
                                 
+                                // 반투명 배경 체크
+                                const bg = style.backgroundColor;
+                                const hasDimmedBg = bg.includes('rgba') && style.position === 'fixed';
+                                
                                 // 무진장 팝업 체크
                                 const isMujinjang = node.querySelector && node.querySelector('[data-section-name="mujinjang_index_popup"]');
                                 
-                                if (hasPopupClass || isHighZIndex || isMujinjang) {
+                                if (hasPopupClass || isHighZIndex || hasDimmedBg || isMujinjang) {
                                     console.log('동적 팝업 감지됨:', node);
+                                    
                                     // 즉시 제거
                                     node.style.display = 'none';
                                     node.remove();
+                                    
+                                    // body 스타일 즉시 복원
+                                    document.body.style.cssText = '';
+                                    document.body.style.overflow = 'visible';
+                                    document.body.style.filter = 'none';
+                                    document.body.style.backgroundColor = 'transparent';
+                                    document.body.style.opacity = '1';
+                                    
+                                    // body 클래스 제거
+                                    ['modal-open', 'popup-open', 'no-scroll', 'overflow-hidden', 'dimmed'].forEach(cls => {
+                                        document.body.classList.remove(cls);
+                                    });
                                 }
                             }
                         });
@@ -347,13 +364,84 @@ def enhanced_close_musinsa_popup(driver, worker_id=None):
                 }
             });
             
-            // 3-5. body 스타일 복원
-            document.body.style.overflow = 'auto';
+            // 3-5. body 스타일 완전 복원 (배경 하얗게 되는 문제 해결)
+            // body 스타일 초기화
+            document.body.style.cssText = '';
+            document.body.style.overflow = 'visible';
             document.body.style.position = 'static';
-            document.documentElement.style.overflow = 'auto';
+            document.body.style.filter = 'none';
+            document.body.style.backgroundColor = 'transparent';
+            document.body.style.opacity = '1';
+            
+            // html 스타일 초기화
+            document.documentElement.style.overflow = 'visible';
+            document.documentElement.style.filter = 'none';
+            document.documentElement.style.backgroundColor = 'transparent';
             
             // body에 설정된 클래스 제거 (modal-open 등)
-            document.body.classList.remove('modal-open', 'popup-open', 'no-scroll');
+            const bodyClasses = Array.from(document.body.classList);
+            bodyClasses.forEach(cls => {
+                if (cls.includes('modal') || cls.includes('popup') || 
+                    cls.includes('open') || cls.includes('fixed') ||
+                    cls.includes('scroll') || cls.includes('dim') ||
+                    cls.includes('no-scroll') || cls.includes('overflow')) {
+                    document.body.classList.remove(cls);
+                }
+            });
+            
+            // 3-6. 가상 요소 제거 (::before, ::after)
+            const cleanupStyle = document.createElement('style');
+            cleanupStyle.id = 'musinsa-popup-cleanup';
+            cleanupStyle.textContent = `
+                body::before, body::after,
+                html::before, html::after {
+                    display: none !important;
+                    content: none !important;
+                    background: none !important;
+                }
+            `;
+            // 기존 cleanup 스타일이 있으면 제거
+            const existingCleanup = document.getElementById('musinsa-popup-cleanup');
+            if (existingCleanup) existingCleanup.remove();
+            document.head.appendChild(cleanupStyle);
+            
+            // 3-7. position:fixed + 반투명 배경 요소 추가 제거
+            const additionalElements = document.querySelectorAll('*');
+            additionalElements.forEach(elem => {
+                const style = window.getComputedStyle(elem);
+                const bg = style.backgroundColor;
+                const position = style.position;
+                const zIndex = parseInt(style.zIndex) || 0;
+                
+                // 반투명 백드롭 제거 (header/nav 제외)
+                if (position === 'fixed' && zIndex > 999) {
+                    const tagName = elem.tagName.toLowerCase();
+                    const className = (elem.className || '').toString().toLowerCase();
+                    const id = (elem.id || '').toLowerCase();
+                    
+                    // 중요 UI 요소가 아닌 경우만 제거
+                    if (!tagName.includes('header') && !tagName.includes('nav') &&
+                        !className.includes('header') && !className.includes('nav') &&
+                        !id.includes('header') && !id.includes('nav') &&
+                        !className.includes('toolbar') && !className.includes('menu')) {
+                        
+                        // 반투명 배경이나 dimmed 효과가 있는 경우
+                        if (bg.includes('rgba') || style.opacity !== '1' ||
+                            className.includes('dim') || className.includes('overlay') ||
+                            className.includes('backdrop') || className.includes('mask')) {
+                            elem.style.display = 'none';
+                            elem.remove();
+                            removedCount++;
+                            removedElements.push('dimmed layer');
+                        }
+                    }
+                }
+            });
+            
+            // 3-8. 강제 리플로우 및 스크롤 복원
+            document.body.offsetHeight; // 리플로우 강제
+            window.scrollTo(0, window.scrollY + 1);
+            window.scrollTo(0, window.scrollY - 1);
             
             return {
                 removedCount: removedCount,

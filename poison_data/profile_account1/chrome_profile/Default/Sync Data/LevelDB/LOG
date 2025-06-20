@@ -1,2 +1,3 @@
-2025/06/19-15:14:54.058 557c Creating DB C:\poison_final\poison_data\profile_account1\chrome_profile\Default\Sync Data\LevelDB since it was missing.
-2025/06/19-15:14:54.077 557c Reusing MANIFEST C:\poison_final\poison_data\profile_account1\chrome_profile\Default\Sync Data\LevelDB/MANIFEST-000001
+2025/06/20-09:39:26.634 4148 Reusing MANIFEST C:\poison_final\poison_data\profile_account1\chrome_profile\Default\Sync Data\LevelDB/MANIFEST-000001
+2025/06/20-09:39:26.634 4148 Recovering log #3
+2025/06/20-09:39:26.635 4148 Reusing old log C:\poison_final\poison_data\profile_account1\chrome_profile\Default\Sync Data\LevelDB/000003.log 

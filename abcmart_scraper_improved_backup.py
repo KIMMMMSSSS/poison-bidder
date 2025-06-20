@@ -12,6 +12,7 @@ from selenium.webdriver.common.keys import Keys
 from datetime import datetime
 from multiprocessing import Process, Queue, Manager
 from scraper_logger import ScraperLogger
+from pathlib import Path
 import sys
 
 def close_abcmart_popup(driver, worker_id=None):

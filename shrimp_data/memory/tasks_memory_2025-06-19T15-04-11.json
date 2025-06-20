@@ -1,0 +1,175 @@
+{
+  "tasks": [
+    {
+      "id": "20e8e1bf-76bf-4c64-9726-ff8630a145c1",
+      "name": "오류 발생 지점 추적 및 원인 분석",
+      "description": "unified_items에 True 값이 전달되는 정확한 지점을 찾고 원인을 분석. 호출 스택 추적 및 로그 분석을 통해 문제 발생 경로 파악.",
+      "status": "completed",
+      "dependencies": [],
+      "createdAt": "2025-06-19T14:30:23.357Z",
+      "updatedAt": "2025-06-19T14:34:40.942Z",
+      "relatedFiles": [
+        {
+          "path": "C:/poison_final/logs",
+          "type": "REFERENCE",
+          "description": "오류 로그 파일들"
+        },
+        {
+          "path": "C:/poison_final/auto_bidding.py",
+          "type": "REFERENCE",
+          "description": "run_with_poison 호출 부분"
+        },
+        {
+          "path": "C:/poison_final/unified_bidding.py",
+          "type": "REFERENCE",
+          "description": "run_with_poison 호출 부분"
+        }
+      ],
+      "implementationGuide": "1. 로그 파일 분석하여 호출 스택 확인\n2. auto_bidding.py, unified_bidding.py에서 run_with_poison 호출 부분 검토\n3. 각 호출 지점에 디버깅 로그 추가하여 파라미터 값 추적\n4. 문제 발생 시나리오 재현 및 원인 문서화",
+      "verificationCriteria": "오류 발생 경로가 명확히 파악되고 문서화됨. 재현 가능한 테스트 케이스 작성.",
+      "analysisResult": "포이즌 입찰 시스템의 unified_items 파라미터 오류를 수정하고 시스템 안정성을 향상시키기 위한 종합적인 작업. 타입 검증, 로깅 개선, 테스트 작성을 통해 견고한 시스템 구축.",
+      "summary": "오류 발생 경로를 명확히 추적하고 원인을 분석했습니다. unified_items 파라미터에 True가 전달되는 문제를 확인하고, 재현 가능한 테스트 케이스와 분석 문서를 작성했습니다.",
+      "completedAt": "2025-06-19T14:34:40.935Z"
+    },
+    {
+      "id": "dffaf26f-8426-47bc-b7c6-d15f13533f42",
+      "name": "poison_integrated_bidding.py 파라미터 검증 추가",
+      "description": "run_with_poison 메서드에 타입 검증, 빈 데이터 체크, 상세 로깅 추가. TypeError 발생 시 명확한 오류 메시지 제공.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "20e8e1bf-76bf-4c64-9726-ff8630a145c1"
+        }
+      ],
+      "createdAt": "2025-06-19T14:30:23.357Z",
+      "updatedAt": "2025-06-19T14:40:58.380Z",
+      "relatedFiles": [
+        {
+          "path": "C:/poison_final/poison_integrated_bidding.py",
+          "type": "TO_MODIFY",
+          "description": "run_with_poison 메서드",
+          "lineStart": 176,
+          "lineEnd": 235
+        }
+      ],
+      "implementationGuide": "1. run_with_poison 메서드 시작 부분에 isinstance(items, list) 체크\n2. items가 비어있지 않은지 확인\n3. 첫 번째 아이템의 구조 검증 (dict 타입, 필수 필드)\n4. 파라미터 정보 로깅 (타입, 개수, 샘플)\n5. 오류 발생 시 상세한 컨텍스트와 함께 로깅",
+      "verificationCriteria": "잘못된 타입 전달 시 명확한 TypeError 발생. 로그에 파라미터 정보가 상세히 기록됨.",
+      "analysisResult": "포이즌 입찰 시스템의 unified_items 파라미터 오류를 수정하고 시스템 안정성을 향상시키기 위한 종합적인 작업. 타입 검증, 로깅 개선, 테스트 작성을 통해 견고한 시스템 구축.",
+      "summary": "poison_integrated_bidding.py의 run_with_poison 메서드에 완전한 파라미터 검증 추가 완료. isinstance 체크, 빈 데이터 처리, 모든 아이템 구조 검증, 필수 필드 검증, 상세 로깅 및 에러 처리 구현",
+      "completedAt": "2025-06-19T14:40:58.379Z"
+    },
+    {
+      "id": "f9590ec8-8942-44d2-8dce-029997a6119d",
+      "name": "poison_bidder_wrapper_v2.py 파라미터 검증 강화",
+      "description": "run_bidding 메서드의 unified_items 파라미터 검증 강화. prepare_bid_data 메서드의 오류 처리 개선.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "20e8e1bf-76bf-4c64-9726-ff8630a145c1"
+        }
+      ],
+      "createdAt": "2025-06-19T14:30:23.357Z",
+      "updatedAt": "2025-06-19T14:45:07.660Z",
+      "relatedFiles": [
+        {
+          "path": "C:/poison_final/poison_bidder_wrapper_v2.py",
+          "type": "TO_MODIFY",
+          "description": "run_bidding 메서드",
+          "lineStart": 157,
+          "lineEnd": 280
+        }
+      ],
+      "implementationGuide": "1. run_bidding 메서드에서 unified_items 타입 검증\n2. None, bool, 빈 리스트 등 잘못된 입력 처리\n3. prepare_bid_data에서 필수 필드 누락 시 경고\n4. 변환 과정 상세 로깅\n5. 오류 발생 시 입력 데이터 덤프",
+      "verificationCriteria": "다양한 잘못된 입력에 대해 적절한 오류 처리. 데이터 변환 과정이 로그에 명확히 기록됨.",
+      "analysisResult": "포이즌 입찰 시스템의 unified_items 파라미터 오류를 수정하고 시스템 안정성을 향상시키기 위한 종합적인 작업. 타입 검증, 로깅 개선, 테스트 작성을 통해 견고한 시스템 구축.",
+      "summary": "poison_bidder_wrapper_v2.py의 파라미터 검증 완전히 강화 완료. run_bidding 메서드에 bool/None/빈 리스트 검증, prepare_bid_data에 타입 검증 및 필수 필드 누락 경고, 상세 로깅 추가",
+      "completedAt": "2025-06-19T14:45:07.659Z"
+    },
+    {
+      "id": "ded607d3-52e4-4adc-abf6-eb4ab6f6c6ee",
+      "name": "호출 모듈 파라미터 전달 검증",
+      "description": "auto_bidding.py와 unified_bidding.py에서 run_with_poison 호출 시 올바른 파라미터 전달 확인. 필요시 수정.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "20e8e1bf-76bf-4c64-9726-ff8630a145c1"
+        }
+      ],
+      "createdAt": "2025-06-19T14:30:23.357Z",
+      "updatedAt": "2025-06-19T14:48:06.184Z",
+      "relatedFiles": [
+        {
+          "path": "C:/poison_final/auto_bidding.py",
+          "type": "TO_MODIFY",
+          "description": "run_with_poison 호출 부분"
+        },
+        {
+          "path": "C:/poison_final/unified_bidding.py",
+          "type": "TO_MODIFY",
+          "description": "run_with_poison 호출 부분"
+        }
+      ],
+      "implementationGuide": "1. auto_bidding.py의 adapter.run_with_poison(items) 호출 검토\n2. unified_bidding.py의 adapter.run_with_poison(items) 호출 검토\n3. items 변수가 실제 리스트인지 확인하는 검증 추가\n4. 호출 전 items 내용 로깅\n5. 빈 리스트 또는 None 처리",
+      "verificationCriteria": "모든 호출 지점에서 올바른 타입의 파라미터가 전달됨. 호출 전 검증 로직이 추가됨.",
+      "analysisResult": "포이즌 입찰 시스템의 unified_items 파라미터 오류를 수정하고 시스템 안정성을 향상시키기 위한 종합적인 작업. 타입 검증, 로깅 개선, 테스트 작성을 통해 견고한 시스템 구축.",
+      "summary": "auto_bidding.py와 unified_bidding.py에서 run_with_poison 호출 전 완전한 파라미터 검증 추가. 타입 검증, 빈 리스트 처리, 호출 전 상세 로깅 구현으로 안정성 향상",
+      "completedAt": "2025-06-19T14:48:06.183Z"
+    },
+    {
+      "id": "d4a4c426-c1cc-4386-a624-63e9f99eca94",
+      "name": "단위 테스트 작성",
+      "description": "파라미터 검증 로직에 대한 단위 테스트 작성. 다양한 엣지 케이스 포함.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "dffaf26f-8426-47bc-b7c6-d15f13533f42"
+        },
+        {
+          "taskId": "f9590ec8-8942-44d2-8dce-029997a6119d"
+        }
+      ],
+      "createdAt": "2025-06-19T14:30:23.357Z",
+      "updatedAt": "2025-06-19T14:49:56.325Z",
+      "relatedFiles": [
+        {
+          "path": "C:/poison_final/test_poison_parameter_validation.py",
+          "type": "CREATE",
+          "description": "새로운 테스트 파일"
+        }
+      ],
+      "implementationGuide": "1. test_poison_parameter_validation.py 파일 생성\n2. 정상 케이스 테스트 (올바른 리스트)\n3. 오류 케이스 테스트 (True, None, 빈 리스트, 잘못된 구조)\n4. 각 모듈의 검증 로직 테스트\n5. 오류 메시지 정확성 검증",
+      "verificationCriteria": "모든 테스트 케이스 통과. 엣지 케이스에 대한 적절한 오류 처리 확인.",
+      "analysisResult": "포이즌 입찰 시스템의 unified_items 파라미터 오류를 수정하고 시스템 안정성을 향상시키기 위한 종합적인 작업. 타입 검증, 로깅 개선, 테스트 작성을 통해 견고한 시스템 구축.",
+      "summary": "파라미터 검증 로직에 대한 완전한 단위 테스트 작성 완료. 정상 케이스, bool/None/빈 리스트 등 다양한 엣지 케이스, 통합 시나리오 테스트 포함. 모든 15개 테스트 케이스 통과",
+      "completedAt": "2025-06-19T14:49:56.324Z"
+    },
+    {
+      "id": "1181e079-2c8f-43d8-962e-a40d40c7894f",
+      "name": "통합 테스트 및 검증",
+      "description": "전체 시스템 플로우 테스트. 실제 데이터로 스크래퍼부터 입찰까지 전 과정 검증.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "ded607d3-52e4-4adc-abf6-eb4ab6f6c6ee"
+        },
+        {
+          "taskId": "d4a4c426-c1cc-4386-a624-63e9f99eca94"
+        }
+      ],
+      "createdAt": "2025-06-19T14:30:23.357Z",
+      "updatedAt": "2025-06-19T14:57:00.483Z",
+      "relatedFiles": [
+        {
+          "path": "C:/poison_final/test_integration.py",
+          "type": "TO_MODIFY",
+          "description": "통합 테스트 강화"
+        }
+      ],
+      "implementationGuide": "1. 작은 샘플 데이터로 전체 플로우 실행\n2. 각 단계별 데이터 변환 확인\n3. 로그 분석으로 문제점 파악\n4. 성공/실패 케이스 문서화\n5. 필요시 추가 수정사항 도출",
+      "verificationCriteria": "전체 플로우가 오류 없이 실행됨. 각 단계의 로그가 명확하고 추적 가능함.",
+      "analysisResult": "포이즌 입찰 시스템의 unified_items 파라미터 오류를 수정하고 시스템 안정성을 향상시키기 위한 종합적인 작업. 타입 검증, 로깅 개선, 테스트 작성을 통해 견고한 시스템 구축.",
+      "summary": "전체 시스템 플로우 통합 테스트 완료. 4개 모듈 모두 정상 동작 확인. 샘플 데이터로 전 과정 검증 성공. 파라미터 검증, 오류 처리, 로깅 모두 정상 작동",
+      "completedAt": "2025-06-19T14:57:00.482Z"
+    }
+  ]
+}

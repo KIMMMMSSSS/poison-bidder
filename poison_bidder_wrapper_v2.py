@@ -22,6 +22,7 @@ from typing import List, Dict, Any, Optional, Tuple
 # 무신사 로그인 관련 imports
 from login_manager import LoginManager
 from dotenv import load_dotenv
+from musinsa_scraper_improved import enhanced_close_musinsa_popup
 
 # Selenium imports
 from selenium import webdriver
@@ -183,7 +184,7 @@ def log_processor_worker(result_queue, result_list_queue):
             continue
 
 
-def worker_process_wrapper(worker_id, task_queue, result_queue, status_dict, login_complete, min_profit, driver_path, stats, musinsa_cookies=None):
+def worker_process_wrapper(worker_id, task_queue, result_queue, status_dict, login_complete, min_profit, driver_path, stats, musinsa_cookies=None, discount_rate=0):
     """워커 프로세스 래퍼 (모듈 레벨 함수)"""
     bidder = None
     try:
@@ -193,6 +194,7 @@ def worker_process_wrapper(worker_id, task_queue, result_queue, status_dict, log
         # PoizonAutoBidderWorker 인스턴스 생성
         bidder = PoizonAutoBidderWorker(worker_id, result_queue, status_dict)
         bidder.min_profit = min_profit
+        bidder.discount_rate = discount_rate
         
         # 무신사 어댑터 초기화 (무신사 쿠키가 있는 경우)
         musinsa_adapter = None
@@ -621,6 +623,7 @@ class PoizonAutoBidderWorker:
         self.driver = None
         self.wait = None
         self.min_profit = 0
+        self.discount_rate = 0
         
     def log_to_queue(self, message):
         """큐를 통한 로그 전송"""
@@ -631,6 +634,16 @@ class PoizonAutoBidderWorker:
         log_entry = f"{idx},{brand},{code},{color},{size},{price},{reason}"
         self.result_queue.put(("FAIL_LOG", log_entry))
         self.log_to_queue(f"[FAIL] {log_entry}")
+
+    # -- 할인율 적용 메소드
+    def apply_custom_discount(self, original_price):
+        """사용자 지정 할인율을 적용하여 목표 입찰가 계산"""
+        if self.discount_rate > 0:
+            target_price = original_price * (1 - self.discount_rate / 100)
+            self.log_to_queue(f"[DISCOUNT] 원가: {original_price:,}원, 할인율: {self.discount_rate}%, 목표가: {int(target_price):,}원")
+            return int(target_price)
+        else:
+            return original_price
 
     # -- 숫자 추출
     def get_int(self, txt):
@@ -1905,21 +1918,42 @@ class PoizonAutoBidderWorker:
                     
                     # Asia 체크가 안 되어 있으면 다운 버튼 클릭
                     self.log_to_queue(f"[INFO] Asia 체크 안 됨 - 다운 버튼 클릭 시도")
-                    if not self.click_down_button(row):
-                        consecutive_fails += 1
-                        self.log_to_queue(f"[INFO] 가격 조정 실패 (연속 {consecutive_fails}회)")
-                        
-                        # 연속 3회 실패 시 Remove
-                        if consecutive_fails >= 3:
-                            self.log_to_queue(f"[INFO] 연속 실패로 인한 Remove")
-                            self.log_fail(idx, brand_name, code, color, size, cost, '가격 조정 불가 Remove')
-                            self.click_remove(row)
-                            break
-                        
-                        # 잠시 대기 후 재시도
-                        time.sleep(2)
+                    
+                    # 할인율 적용한 목표가 계산
+                    target_price = self.apply_custom_discount(cost)
+                    
+                    # 현재 가격이 목표가보다 높을 때만 다운 버튼 클릭
+                    if current_price > target_price:
+                        self.log_to_queue(f"[INFO] 현재가({current_price:,}) > 목표가({target_price:,}) - 다운 버튼 클릭")
+                        if not self.click_down_button(row):
+                            consecutive_fails += 1
+                            self.log_to_queue(f"[INFO] 가격 조정 실패 (연속 {consecutive_fails}회)")
+                            
+                            # 연속 3회 실패 시 Remove
+                            if consecutive_fails >= 3:
+                                self.log_to_queue(f"[INFO] 연속 실패로 인한 Remove")
+                                self.log_fail(idx, brand_name, code, color, size, cost, '가격 조정 불가 Remove')
+                                self.click_remove(row)
+                                break
+                            
+                            # 잠시 대기 후 재시도
+                            time.sleep(2)
+                        else:
+                            consecutive_fails = 0  # 성공 시 카운터 리셋
                     else:
-                        consecutive_fails = 0  # 성공 시 카운터 리셋
+                        # 현재 가격이 이미 목표가 이하인 경우
+                        self.log_to_queue(f"[INFO] 현재가({current_price:,}) <= 목표가({target_price:,}) - 추가 조정 불필요")
+                        
+                        # 예상수익 재확인
+                        if est_payout >= cost and profit >= self.min_profit:
+                            self.log_to_queue(f"[OK] 입찰조건 충족: {matched_text} (수익: {profit}원)")
+                            successful.append(match_info)
+                            all_failed = False
+                        else:
+                            self.log_to_queue(f"[INFO] 예상수익 부족 - Remove")
+                            self.log_fail(idx, brand_name, code, color, size, cost, f'예상수익 부족 {profit}')
+                            self.click_remove(row)
+                        break  # while 루프 종료
                         
                 except StaleElementReferenceException:
                     retry_count += 1
@@ -2321,7 +2355,8 @@ class PoizonBidderWrapperV2:
                 # 팝업 처리 추가
                 logger.info("무신사 팝업 처리 시도")
                 try:
-                    popup_result = self.musinsa_login_mgr.handle_musinsa_popup()
+                    # enhanced_close_musinsa_popup 함수 사용
+                    popup_result = enhanced_close_musinsa_popup(self.musinsa_login_mgr.driver, worker_id=None)
                     if popup_result:
                         logger.info("무신사 팝업 처리 성공")
                     else:
@@ -2341,11 +2376,12 @@ class PoizonBidderWrapperV2:
                     # 팝업 처리 추가
                     logger.info("무신사 팝업 처리 시도")
                     try:
-                        popup_result = self.musinsa_login_mgr.handle_musinsa_popup()
+                        # enhanced_close_musinsa_popup 함수 사용
+                        popup_result = enhanced_close_musinsa_popup(self.musinsa_login_mgr.driver, worker_id=None)
                         if popup_result:
                             logger.info("무신사 팝업 처리 성공")
                         else:
-                            logger.warning("무신사 팝업이 없거나 처리하질 못했습니다")
+                            logger.warning("무신사 팝업이 없거나 처리하지 못했습니다")
                     except Exception as e:
                         logger.warning(f"무신사 팝업 처리 중 오류 (무시하고 계속): {e}")
                     
@@ -2425,62 +2461,16 @@ class PoizonBidderWrapperV2:
             # 상품 페이지 접속
             driver.get(url)
             
-            # 팝업 처리 (무진장 이벤트 팝업 등)
+            # 팝업 처리 - enhanced_close_musinsa_popup 함수 사용
             time.sleep(2)  # 팝업이 나타날 시간을 줌
-            popup_handled = False
-            
-            # 입장하기 팝업 처리
             try:
-                # 입장하기 버튼 찾기
-                entry_button = driver.find_element(
-                    By.XPATH, 
-                    "//button[contains(@class, 'sc-74232346-0') and .//span[text()='입장하기']]"
-                )
-                if entry_button.is_displayed():
-                    logger.info("무진장 이벤트 팝업 발견 - 입장하기 클릭")
-                    driver.execute_script("arguments[0].click();", entry_button)
-                    popup_handled = True
-                    time.sleep(1)
-            except NoSuchElementException:
-                pass
+                popup_handled = enhanced_close_musinsa_popup(driver, worker_id=None)
+                if popup_handled:
+                    logger.info("무신사 팝업 처리 성공")
+                else:
+                    logger.info("무신사 팝업이 없거나 처리하지 못했습니다")
             except Exception as e:
-                logger.warning(f"입장하기 팝업 처리 중 예외: {e}")
-            
-            # 오늘 그만 보기 옵션으로 팝업 처리 (입장하기가 실패한 경우)
-            if not popup_handled:
-                try:
-                    dismiss_button = driver.find_element(
-                        By.XPATH,
-                        "//button[contains(@class, 'sc-37768b80-12') and text()='오늘 그만 보기']"
-                    )
-                    if dismiss_button.is_displayed():
-                        logger.info("무진장 이벤트 팝업 발견 - 오늘 그만 보기 클릭")
-                        driver.execute_script("arguments[0].click();", dismiss_button)
-                        popup_handled = True
-                        time.sleep(1)
-                except NoSuchElementException:
-                    pass
-                except Exception as e:
-                    logger.warning(f"오늘 그만 보기 팝업 처리 중 예외: {e}")
-            
-            # 기타 일반 팝업 처리 (X 버튼)
-            try:
-                close_buttons = driver.find_elements(
-                    By.XPATH,
-                    "//button[contains(@class, 'close') or contains(@aria-label, 'close') or contains(@aria-label, '닫기')]"
-                )
-                for close_btn in close_buttons:
-                    if close_btn.is_displayed():
-                        logger.info("일반 팝업 닫기 버튼 발견")
-                        driver.execute_script("arguments[0].click();", close_btn)
-                        popup_handled = True
-                        time.sleep(0.5)
-                        break
-            except Exception as e:
-                logger.warning(f"일반 팝업 처리 중 예외: {e}")
-            
-            if popup_handled:
-                logger.info("팝업 처리 완료")
+                logger.warning(f"무신사 팝업 처리 중 예외 (무시하고 계속): {e}")
             
             # 페이지 로드 대기
             try:
@@ -2703,7 +2693,8 @@ class PoizonBidderWrapperV2:
     
     def run_bidding(self, bid_data_file: Optional[str] = None, 
                    bid_data_list: Optional[List[Tuple]] = None,
-                   unified_items: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
+                   unified_items: Optional[List[Dict[str, Any]]] = None,
+                   discount_rate: float = 0) -> Dict[str, Any]:
         """
         입찰 실행
         
@@ -2845,7 +2836,7 @@ class PoizonBidderWrapperV2:
                 worker = Process(
                     target=worker_process_wrapper,
                     args=(i, task_queue, result_queue, status_dict, login_complete, 
-                          self.min_profit, self.driver_path, stats, musinsa_cookies)
+                          self.min_profit, self.driver_path, stats, musinsa_cookies, discount_rate)
                 )
                 workers.append(worker)
                 worker.start()

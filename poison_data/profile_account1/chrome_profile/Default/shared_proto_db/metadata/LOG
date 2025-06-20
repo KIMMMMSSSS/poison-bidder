@@ -1,2 +1,3 @@
-2025/06/19-15:14:54.233 19e0 Creating DB C:\poison_final\poison_data\profile_account1\chrome_profile\Default\shared_proto_db\metadata since it was missing.
-2025/06/19-15:14:54.245 19e0 Reusing MANIFEST C:\poison_final\poison_data\profile_account1\chrome_profile\Default\shared_proto_db\metadata/MANIFEST-000001
+2025/06/20-09:39:26.811 6afc Reusing MANIFEST C:\poison_final\poison_data\profile_account1\chrome_profile\Default\shared_proto_db\metadata/MANIFEST-000001
+2025/06/20-09:39:26.812 6afc Recovering log #3
+2025/06/20-09:39:26.812 6afc Reusing old log C:\poison_final\poison_data\profile_account1\chrome_profile\Default\shared_proto_db\metadata/000003.log 

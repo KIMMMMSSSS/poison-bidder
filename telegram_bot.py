@@ -20,7 +20,10 @@ import status_constants
 
 # python-telegram-bot 라이브러리
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
+from telegram.ext import (
+    Application, CommandHandler, CallbackQueryHandler, ContextTypes,
+    ConversationHandler, MessageHandler, filters
+)
 
 # 통합 모듈 import
 from unified_bidding import UnifiedBidding
@@ -40,6 +43,9 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger(__name__)
+
+# ConversationHandler 상태 정의
+WAITING_DISCOUNT, WAITING_PROFIT = range(2)
 
 
 class BiddingBot:
@@ -91,15 +97,15 @@ class BiddingBot:
         await update.message.reply_text(welcome_text, parse_mode='Markdown')
     
     async def auto_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """자동화 링크 추출 + 입찰 명령어"""
+        """자동화 링크 추출 + 입찰 명령어 (대화형)"""
         if not self.is_authorized(update.effective_user.id):
             await update.message.reply_text(self.config['messages']['unauthorized'])
-            return
+            return ConversationHandler.END
         
         # 이미 실행 중인지 확인
         if self.is_running:
             await update.message.reply_text(self.config['messages']['task_running'])
-            return
+            return ConversationHandler.END
         
         # 파라미터 파싱
         args = context.args
@@ -115,7 +121,7 @@ class BiddingBot:
                 site = 'musinsa'
             else:
                 await update.message.reply_text(f"❌ 유효하지 않은 사이트: {site}\n사용 가능: {', '.join(valid_sites)}")
-                return
+                return ConversationHandler.END
         
         if not keywords:
             await update.message.reply_text(
@@ -128,27 +134,22 @@ class BiddingBot:
                 "키워드를 공백으로 구분하여 입력하세요.",
                 parse_mode='Markdown'
             )
-            return
+            return ConversationHandler.END
         
-        # 확인 메시지
-        keyboard = [
-            [
-                InlineKeyboardButton("✅ 시작", callback_data=f"auto_start_{site}_{'|'.join(keywords)}"),
-                InlineKeyboardButton("❌ 취소", callback_data="auto_cancel")
-            ]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
+        # context.user_data에 기본 정보 저장
+        context.user_data['site'] = site
+        context.user_data['keywords'] = keywords
         
+        # 할인율 입력 요청
         await update.message.reply_text(
-            f"🤖 **자동화 입찰 설정**\n\n"
-            f"사이트: {site}\n"
-            f"키워드: {', '.join(keywords)}\n\n"
-            f"링크 추출부터 입찰까지 자동으로 진행합니다.\n"
-            f"예상 시간: 10-15분\n\n"
-            f"계속하시겠습니까?",
-            reply_markup=reply_markup,
+            "💰 **할인율 설정**\n\n"
+            "희망 할인율을 입력하세요 (1-30%)\n"
+            "예: 5, 10, 15, 20\n\n"
+            "숫자만 입력하면 됩니다.",
             parse_mode='Markdown'
         )
+        
+        return WAITING_DISCOUNT
     
     async def help_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """도움말 명령어"""
@@ -304,6 +305,110 @@ class BiddingBot:
         
         await update.message.reply_text(text, parse_mode='Markdown')
     
+    async def discount_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """할인율 입력 처리"""
+        try:
+            # 입력값 파싱
+            text = update.message.text.strip()
+            discount = float(text.replace('%', ''))
+            
+            # 유효성 검사 (1-30%)
+            if not 1 <= discount <= 30:
+                await update.message.reply_text(
+                    "⚠️ 할인율은 1-30% 범위여야 합니다.\n"
+                    "다시 입력해주세요.",
+                    parse_mode='Markdown'
+                )
+                return WAITING_DISCOUNT
+            
+            # 저장
+            context.user_data['discount_rate'] = discount
+            
+            # 최소 수익 입력 요청
+            await update.message.reply_text(
+                "💵 **최소 예상 수익 설정**\n\n"
+                "최소 예상 수익을 입력하세요 (0원 이상)\n"
+                "예: 5000, 10000, 20000\n\n"
+                "숫자만 입력하면 됩니다.",
+                parse_mode='Markdown'
+            )
+            
+            return WAITING_PROFIT
+            
+        except ValueError:
+            await update.message.reply_text(
+                "⚠️ 숫자만 입력해주세요.\n"
+                "예: 5, 10, 15, 20",
+                parse_mode='Markdown'
+            )
+            return WAITING_DISCOUNT
+    
+    async def profit_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """최소 수익 입력 처리"""
+        try:
+            # 입력값 파싱
+            text = update.message.text.strip()
+            min_profit = int(text.replace(',', '').replace('원', ''))
+            
+            # 유효성 검사 (0원 이상)
+            if min_profit < 0:
+                await update.message.reply_text(
+                    "⚠️ 최소 예상 수익은 0원 이상이어야 합니다.\n"
+                    "다시 입력해주세요.",
+                    parse_mode='Markdown'
+                )
+                return WAITING_PROFIT
+            
+            # 저장
+            context.user_data['min_profit'] = min_profit
+            
+            # 최종 확인 메시지
+            site = context.user_data.get('site', 'musinsa')
+            keywords = context.user_data.get('keywords', [])
+            discount_rate = context.user_data.get('discount_rate', 5)
+            
+            # callback_data에 설정값 포함
+            callback_data = f"auto_start_custom_{site}_{'|'.join(keywords)}_{discount_rate}_{min_profit}"
+            
+            keyboard = [
+                [
+                    InlineKeyboardButton("✅ 시작", callback_data=callback_data),
+                    InlineKeyboardButton("❌ 취소", callback_data="auto_cancel")
+                ]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            await update.message.reply_text(
+                f"🤖 **자동화 입찰 설정 확인**\n\n"
+                f"🏪 사이트: {site.upper()}\n"
+                f"🔍 키워드: {', '.join(keywords)}\n"
+                f"💰 할인율: {discount_rate}%\n"
+                f"💵 최소 수익: {min_profit:,}원\n\n"
+                f"이대로 진행하시겠습니까?",
+                reply_markup=reply_markup,
+                parse_mode='Markdown'
+            )
+            
+            return ConversationHandler.END
+            
+        except ValueError:
+            await update.message.reply_text(
+                "⚠️ 숫자만 입력해주세요.\n"
+                "예: 5000, 10000, 20000",
+                parse_mode='Markdown'
+            )
+            return WAITING_PROFIT
+    
+    async def cancel_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """대화 취소 처리"""
+        await update.message.reply_text(
+            "❌ 설정이 취소되었습니다.",
+            parse_mode='Markdown'
+        )
+        # user_data 초기화
+        context.user_data.clear()
+        return ConversationHandler.END
+    
     async def button_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """버튼 콜백 처리"""
         query = update.callback_query
@@ -321,14 +426,39 @@ class BiddingBot:
             
         elif data.startswith("auto_start_"):
             # 자동화 입찰 시작
-            parts = data.split("_", 3)
-            site = parts[2]
-            keywords = parts[3].split("|") if len(parts) > 3 else []
+            custom_discount_rate = None
+            custom_min_profit = None
+            
+            if data.startswith("auto_start_custom_"):
+                # 커스텀 설정이 있는 경우
+                # 형식: auto_start_custom_{site}_{keywords}_{discount}_{profit}
+                parts = data.replace("auto_start_custom_", "").split("_")
+                
+                if len(parts) >= 4:
+                    site = parts[0]
+                    # 마지막 두 부분은 설정값
+                    try:
+                        custom_min_profit = int(parts[-1])
+                        custom_discount_rate = float(parts[-2])
+                        # 나머지는 키워드
+                        keywords_part = "_".join(parts[1:-2])
+                        keywords = keywords_part.split("|") if keywords_part else []
+                    except (ValueError, IndexError):
+                        # 파싱 실패 시 기본값 사용
+                        keywords = parts[1].split("|") if len(parts) > 1 else []
+                else:
+                    site = parts[0] if parts else 'musinsa'
+                    keywords = parts[1].split("|") if len(parts) > 1 else []
+            else:
+                # 기본 설정
+                parts = data.split("_", 3)
+                site = parts[2]
+                keywords = parts[3].split("|") if len(parts) > 3 else []
             
             await query.edit_message_text("🤖 자동화 입찰을 시작합니다...")
             
-            # 비동기로 자동 입찰 실행
-            asyncio.create_task(self._run_auto_bidding(query, site, keywords))
+            # 비동기로 자동 입찰 실행 (커스텀 설정 포함)
+            asyncio.create_task(self._run_auto_bidding(query, site, keywords, custom_discount_rate, custom_min_profit))
             
         elif data == "bid_cancel" or data == "auto_cancel":
             await query.edit_message_text("❌ 취소되었습니다.")
@@ -340,7 +470,9 @@ class BiddingBot:
         elif data == "stop_cancel":
             await query.edit_message_text("↩️ 작업을 계속 진행합니다.")
     
-    async def _run_auto_bidding(self, query, site: str, keywords: list):
+    async def _run_auto_bidding(self, query, site: str, keywords: list,
+                                custom_discount_rate: float = None,
+                                custom_min_profit: int = None):
         """자동화 입찰 실행 (비동기)"""
         chat_id = query.message.chat_id
         
@@ -355,13 +487,26 @@ class BiddingBot:
                 'stage': '초기화'
             }
             
-            # 시작 메시지
-            await query.message.chat.send_message(
+            # 시작 메시지 구성
+            start_message = (
                 f"🚀 **자동화 입찰 시작**\n\n"
                 f"🎯 사이트: {site.upper()}\n"
                 f"🔍 키워드: {', '.join(keywords)}\n"
-                f"⏰ 예상 시간: 10-15분\n\n"
-                f"진행 상황을 알려드리겠습니다...",
+            )
+            
+            # 커스텀 설정이 있으면 표시
+            if custom_discount_rate is not None:
+                start_message += f"💰 할인율: {custom_discount_rate}%\n"
+            if custom_min_profit is not None:
+                start_message += f"💵 최소 수익: {custom_min_profit:,}원\n"
+            
+            start_message += (
+                f"\n⏰ 예상 시간: 10-15분\n\n"
+                f"진행 상황을 알려드리겠습니다..."
+            )
+            
+            await query.message.chat.send_message(
+                start_message,
                 parse_mode='Markdown'
             )
             
@@ -429,7 +574,9 @@ class BiddingBot:
                     site=site,
                     keywords=keywords,
                     strategy='basic',
-                    status_callback=status_callback
+                    status_callback=status_callback,
+                    custom_discount_rate=custom_discount_rate,
+                    custom_min_profit=custom_min_profit
                 )
                 
                 # 작업 완료 후 잠시 대기 (마지막 메시지 처리)
@@ -442,6 +589,15 @@ class BiddingBot:
                         f"✅ **자동화 입찰 완료!**\n\n"
                         f"📊 **결과 요약**\n"
                         f"├ 🔍 검색 키워드: {', '.join(keywords)}\n"
+                    )
+                    
+                    # 커스텀 설정이 있으면 표시
+                    if custom_discount_rate is not None:
+                        success_msg += f"├ 💰 적용 할인율: {custom_discount_rate}%\n"
+                    if custom_min_profit is not None:
+                        success_msg += f"├ 💵 설정 최소 수익: {custom_min_profit:,}원\n"
+                    
+                    success_msg += (
                         f"├ 🔗 수집된 링크: {result.get('total_links', 0)}개\n"
                         f"├ 📦 처리된 상품: {result.get('total_items', 0)}개\n"
                         f"├ ✅ 성공한 입찰: {result.get('successful_bids', 0)}개\n"
@@ -587,10 +743,20 @@ class BiddingBot:
         # Application 생성
         application = Application.builder().token(token).build()
         
+        # ConversationHandler 생성 (auto 명령어용)
+        conv_handler = ConversationHandler(
+            entry_points=[CommandHandler("auto", self.auto_command)],
+            states={
+                WAITING_DISCOUNT: [MessageHandler(filters.TEXT & ~filters.COMMAND, self.discount_handler)],
+                WAITING_PROFIT: [MessageHandler(filters.TEXT & ~filters.COMMAND, self.profit_handler)]
+            },
+            fallbacks=[CommandHandler("cancel", self.cancel_handler)]
+        )
+        
         # 핸들러 등록
         application.add_handler(CommandHandler("start", self.start_command))
         application.add_handler(CommandHandler("help", self.help_command))
-        application.add_handler(CommandHandler("auto", self.auto_command))  # 자동화 명령어 추가
+        application.add_handler(conv_handler)  # ConversationHandler 등록
         application.add_handler(CommandHandler("bid", self.bid_command))
         application.add_handler(CommandHandler("status", self.status_command))
         application.add_handler(CommandHandler("stop", self.stop_command))
