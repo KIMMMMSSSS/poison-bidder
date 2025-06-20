@@ -773,6 +773,7 @@ class AutoBidding:
                 musinsa_links = set()  # set으로 초기화
                 last_height = self.driver.execute_script("return document.body.scrollHeight")
                 scroll_count = 0
+                no_change_count = 0  # 높이 변화 없음 카운트
                 
                 # 팝업 체크 간격 설정
                 popup_check_interval = self.config['extraction'].get('popup_check_interval', 3)
@@ -870,12 +871,25 @@ class AutoBidding:
                             }
                         )
                     
-                    # 높이 확인
+                    # 높이 확인 및 무한 스크롤 처리 개선
                     new_height = self.driver.execute_script("return document.body.scrollHeight")
+                    
+                    # 높이가 같아도 바로 종료하지 않고 재시도
                     if new_height == last_height:
-                        logger.info(f"페이지 끝 도달 (스크롤 {scroll_count}회, 총 {len(musinsa_links)}개 링크)")
-                        break
-                    last_height = new_height
+                        no_change_count += 1
+                        logger.debug(f"높이 변화 없음 ({no_change_count}/3)")
+                        
+                        # 3번 연속으로 높이가 같을 때만 종료
+                        if no_change_count >= 3:
+                            logger.info(f"페이지 끝 도달 확정 (스크롤 {scroll_count}회, 총 {len(musinsa_links)}개 링크)")
+                            break
+                        else:
+                            # 다시 시도하기 위해 추가 대기
+                            logger.info(f"추가 컨텐츠 로드 대기 중... ({no_change_count}/3)")
+                            time.sleep(2)  # 추가 대기
+                    else:
+                        no_change_count = 0  # 높이가 변했으면 카운트 리셋
+                        last_height = new_height
                 
                 # 최종 통계 및 list로 변환하여 병합
                 logger.info(f"무신사 링크 추출 완료: 총 {len(musinsa_links)}개 고유 링크 수집")

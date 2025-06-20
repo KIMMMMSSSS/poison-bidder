@@ -4,7 +4,7 @@
     "abcmart": ["운동화", "스니커즈", "러닝화"]
   },
   "extraction": {
-    "max_scrolls": 10,
+    "max_scrolls": 30,
     "wait_time": 3,
     "max_links": 100,
     "timeout": 30,
