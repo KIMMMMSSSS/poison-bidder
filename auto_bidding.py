@@ -999,16 +999,90 @@ class AutoBidding:
                 item = {'link': link}
                 
                 if site == "musinsa":
-                    # 무신사 스크래핑
+                    # 무신사 스크래핑 (최신 CSS 셀렉터)
                     try:
-                        item['brand'] = self.driver.find_element(By.CSS_SELECTOR, ".product_title em").text
-                        item['name'] = self.driver.find_element(By.CSS_SELECTOR, ".product_title strong").text
-                        price_text = self.driver.find_element(By.CSS_SELECTOR, ".price").text
-                        item['price'] = int(re.sub(r'[^\d]', '', price_text))
+                        # 브랜드 추출
+                        try:
+                            brand_elem = self.driver.find_element(By.CSS_SELECTOR, "a.gtm-click-brand span[data-mds='Typography']")
+                            item['brand'] = brand_elem.text.strip()
+                            # "브랜드샵 바로가기" 같은 잘못된 텍스트 필터링
+                            if "바로가기" in item['brand'] or "브랜드샵" in item['brand']:
+                                # href에서 브랜드 추출
+                                brand_link = self.driver.find_element(By.CSS_SELECTOR, "a.gtm-click-brand")
+                                href = brand_link.get_attribute("href")
+                                if "/brand/" in href:
+                                    item['brand'] = href.split("/brand/")[-1].upper()
+                        except:
+                            item['brand'] = "Unknown"
                         
-                        # 사이즈 옵션
-                        size_elements = self.driver.find_elements(By.CSS_SELECTOR, "select[name='size'] option")
-                        item['sizes'] = [e.text for e in size_elements if e.text and e.text != '사이즈 선택']
+                        # 상품명 추출
+                        try:
+                            name_elem = self.driver.find_element(By.CSS_SELECTOR, "span[data-mds='Typography'].text-title_18px_med")
+                            item['name'] = name_elem.text.strip()
+                        except:
+                            item['name'] = "Unknown"
+                        
+                        # 가격 추출 (최대혜택가)
+                        try:
+                            # JavaScript로 직접 추출
+                            price_text = self.driver.execute_script("""
+                                const section = document.querySelector('.sc-x9uktx-0.WoXHk');
+                                if (section) {
+                                    const spans = section.querySelectorAll('span.text-red.text-title_18px_semi');
+                                    for (let span of spans) {
+                                        if (span.textContent.includes('원') && !span.textContent.includes('%')) {
+                                            return span.textContent;
+                                        }
+                                    }
+                                }
+                                // 대체 방법: 어떤 가격이든 찾기
+                                const priceElem = document.querySelector("span[class*='text-title_18px_semi']:contains('원')");
+                                if (priceElem) return priceElem.textContent;
+                                
+                                // XPath로 시도
+                                const xpath = "//span[contains(@class, 'text-red') and contains(text(), '원') and not(contains(text(), '%'))]";
+                                const result = document.evaluate(xpath, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
+                                if (result.singleNodeValue) return result.singleNodeValue.textContent;
+                                
+                                return null;
+                            """)
+                            
+                            if price_text:
+                                item['price'] = int(re.sub(r'[^\d]', '', price_text))
+                            else:
+                                # 대체 방법: 정가 찾기
+                                price_elem = self.driver.find_element(By.XPATH, "//span[contains(@class, 'text-title_18px_semi') and contains(text(), '원')]")
+                                item['price'] = int(re.sub(r'[^\d]', '', price_elem.text))
+                        except Exception as e:
+                            logger.debug(f"가격 추출 실패: {e}")
+                            item['price'] = 0
+                        
+                        # 사이즈 추출 (드롭다운 방식)
+                        try:
+                            sizes = []
+                            # 드롭다운 찾기
+                            size_dropdown = self.driver.find_element(By.CSS_SELECTOR, "input[data-mds='DropdownTriggerInput'][placeholder='사이즈']")
+                            size_dropdown.click()
+                            time.sleep(0.5)
+                            
+                            # 사이즈 옵션 추출
+                            size_elements = self.driver.find_elements(By.CSS_SELECTOR, "[data-mds='StaticDropdownMenuItem']")
+                            for elem in size_elements:
+                                text = elem.text.strip()
+                                if not text or '(' in text and '품절' in text:
+                                    continue
+                                # 사이즈 번호만 추출
+                                size_match = re.match(r'^(\d+)', text)
+                                if size_match:
+                                    sizes.append(size_match.group(1))
+                            
+                            # 드롭다운 닫기
+                            self.driver.find_element(By.TAG_NAME, 'body').click()
+                            
+                            item['sizes'] = sizes if sizes else ['ONE SIZE']
+                        except:
+                            # 드롭다운이 없으면 원사이즈
+                            item['sizes'] = ['ONE SIZE']
                         
                     except Exception as e:
                         logger.warning(f"상품 정보 추출 실패: {e}")

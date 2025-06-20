@@ -6,8 +6,11 @@
   "extraction": {
     "max_scrolls": 10,
     "wait_time": 3,
-    "max_links": 30,
-    "timeout": 30
+    "max_links": 100,
+    "timeout": 30,
+    "max_pages": 100,
+    "page_wait_time": 3,
+    "empty_page_threshold": 2
   },
   "pricing": {
     "default_strategy": "basic",
