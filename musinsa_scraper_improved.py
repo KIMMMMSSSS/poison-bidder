@@ -31,6 +31,10 @@ def close_musinsa_popup(driver, worker_id=None):
     
     # 일반적인 팝업 셀렉터들
     popup_selectors = [
+        # 무진장 팝업 - 우선순위 높음
+        "button[data-button-name='오늘 그만 보기']",
+        "[data-button-id='dismisstoday']",
+        
         # 모달 닫기 버튼들
         "button[aria-label='Close']",
         "button[aria-label='닫기']",
@@ -59,6 +63,55 @@ def close_musinsa_popup(driver, worker_id=None):
     ]
     
     try:
+        # 먼저 JavaScript로 무진장 팝업 확인 및 제거
+        popup_removed = driver.execute_script("""
+            // 무진장 팝업 찾기
+            const mujinjangPopup = document.querySelector('[data-section-name="mujinjang_index_popup"]');
+            if (mujinjangPopup) {
+                // 오늘 그만 보기 버튼 찾기
+                const dismissButton = document.querySelector('[data-button-name="오늘 그만 보기"]');
+                if (dismissButton) {
+                    dismissButton.click();
+                    console.log('무진장 팝업 - 오늘 그만 보기 클릭');
+                    return true;
+                } else {
+                    // 버튼을 못 찾으면 팝업 자체를 제거
+                    const popupContainer = mujinjangPopup.closest('.modal') || 
+                                         mujinjangPopup.closest('[role="dialog"]') || 
+                                         mujinjangPopup.parentElement;
+                    if (popupContainer) {
+                        popupContainer.style.display = 'none';
+                        popupContainer.remove();
+                        console.log('무진장 팝업 강제 제거');
+                        return true;
+                    }
+                }
+            }
+            
+            // 일반 모달/팝업 제거
+            const modals = document.querySelectorAll('.modal:not([style*="display: none"]), .popup:not([style*="display: none"]), .layer-popup:not([style*="display: none"])');
+            let removed = false;
+            modals.forEach(function(modal) {
+                modal.style.display = 'none';
+                modal.remove();
+                removed = true;
+            });
+            
+            // 모달 백드롭 제거
+            const backdrops = document.querySelectorAll('.modal-backdrop, .overlay');
+            backdrops.forEach(function(backdrop) {
+                backdrop.remove();
+                removed = true;
+            });
+            
+            return removed;
+        """)
+        
+        if popup_removed:
+            print(f"{worker_prefix}JavaScript로 팝업 제거 성공")
+            popup_closed = True
+            time.sleep(0.2)  # DOM 업데이트 대기
+        
         # 각 셀렉터로 팝업 찾기 시도
         for selector in popup_selectors:
             try:
@@ -87,7 +140,7 @@ def close_musinsa_popup(driver, worker_id=None):
         if not popup_closed:
             try:
                 # 팝업이 있는지 먼저 확인
-                popup_elements = driver.find_elements(By.CSS_SELECTOR, ".modal, .popup, .layer-popup, .modal-backdrop, .overlay")
+                popup_elements = driver.find_elements(By.CSS_SELECTOR, ".modal, .popup, .layer-popup, .modal-backdrop, .overlay, [data-section-name='mujinjang_index_popup']")
                 visible_popups = [elem for elem in popup_elements if elem.is_displayed()]
                 
                 if visible_popups:  # 팝업이 있는 경우에만 ESC 시도
@@ -96,7 +149,7 @@ def close_musinsa_popup(driver, worker_id=None):
                     time.sleep(0.1)
                     
                     # ESC 키 후 팝업이 사라졌는지 확인
-                    remaining_popups = driver.find_elements(By.CSS_SELECTOR, ".modal, .popup, .layer-popup, .modal-backdrop, .overlay")
+                    remaining_popups = driver.find_elements(By.CSS_SELECTOR, ".modal, .popup, .layer-popup, .modal-backdrop, .overlay, [data-section-name='mujinjang_index_popup']")
                     visible_remaining = [elem for elem in remaining_popups if elem.is_displayed()]
                     
                     if len(visible_remaining) < len(visible_popups):

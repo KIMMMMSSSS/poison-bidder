@@ -93,9 +93,17 @@
   1. JavaScript로 즉시 팝업 감지/제거 시도
   2. CSS 셀렉터로 다양한 팝업 유형 확인
   3. ESC 키로 팝업 닫기 (마지막 수단)
+- **특수 팝업 처리**:
+  - **무진장 팝업**: `[data-section-name="mujinjang_index_popup"]`
+    - "오늘 그만 보기" 버튼 클릭 우선
+    - 버튼 못 찾으면 팝업 전체 제거
 - **팝업 셀렉터 목록**:
   ```python
   popup_selectors = [
+      # 무진장 팝업 - 우선순위 높음
+      "button[data-button-name='오늘 그만 보기']",
+      "[data-button-id='dismisstoday']",
+      
       # 모달 닫기 버튼들
       "button[aria-label='Close']",
       "button[aria-label='닫기']",
