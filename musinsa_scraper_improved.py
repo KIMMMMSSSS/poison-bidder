@@ -164,6 +164,326 @@ def close_musinsa_popup(driver, worker_id=None):
     
     return popup_closed
 
+
+def enhanced_close_musinsa_popup(driver, worker_id=None):
+    """
+    향상된 무신사 팝업 처리 함수
+    
+    Args:
+        driver: Selenium WebDriver 인스턴스
+        worker_id: 워커 ID (로깅용, 선택사항)
+    
+    Returns:
+        dict: 팝업 제거 상태 정보
+            - closed: 팝업이 닫혔으면 True
+            - removed_count: 제거된 팝업 수
+            - methods_used: 사용된 제거 방법 목록
+    """
+    worker_prefix = f"[Worker {worker_id}] " if worker_id else ""
+    removed_count = 0
+    methods_used = []
+    
+    try:
+        # 1. 페이지 로드 완료 대기
+        driver.execute_script("""
+            return new Promise(resolve => {
+                if (document.readyState === 'complete') {
+                    resolve(true);
+                } else {
+                    window.addEventListener('load', () => resolve(true));
+                    setTimeout(() => resolve(true), 3000);  // 최대 3초 대기
+                }
+            });
+        """)
+        
+        # 2. MutationObserver 설치 (동적 팝업 감지)
+        observer_installed = driver.execute_script("""
+            if (!window.musinsaPopupObserver) {
+                window.musinsaPopupObserver = new MutationObserver(function(mutations) {
+                    mutations.forEach(function(mutation) {
+                        mutation.addedNodes.forEach(function(node) {
+                            if (node.nodeType === 1) {  // Element node
+                                // 팝업 관련 클래스 체크
+                                const popupClasses = ['modal', 'popup', 'layer-popup', 'overlay', 'modal-backdrop'];
+                                const hasPopupClass = popupClasses.some(cls => 
+                                    node.classList && node.classList.contains(cls)
+                                );
+                                
+                                // z-index 체크
+                                const style = window.getComputedStyle(node);
+                                const zIndex = parseInt(style.zIndex);
+                                const isHighZIndex = zIndex > 9999;
+                                
+                                // 무진장 팝업 체크
+                                const isMujinjang = node.querySelector && node.querySelector('[data-section-name="mujinjang_index_popup"]');
+                                
+                                if (hasPopupClass || isHighZIndex || isMujinjang) {
+                                    console.log('동적 팝업 감지됨:', node);
+                                    // 즉시 제거
+                                    node.style.display = 'none';
+                                    node.remove();
+                                }
+                            }
+                        });
+                    });
+                });
+                
+                // 옵저버 시작
+                window.musinsaPopupObserver.observe(document.body, {
+                    childList: true,
+                    subtree: true
+                });
+                
+                console.log('MutationObserver 설치 완료');
+                return true;
+            }
+            return false;
+        """)
+        
+        if observer_installed:
+            print(f"{worker_prefix}MutationObserver 설치 성공")
+            methods_used.append("MutationObserver")
+        
+        # 3. 강화된 JavaScript 실행 (포괄적 팝업 제거)
+        js_result = driver.execute_script("""
+            let removedCount = 0;
+            const removedElements = [];
+            
+            // 3-1. 무진장 팝업 특별 처리
+            const mujinjangPopup = document.querySelector('[data-section-name="mujinjang_index_popup"]');
+            if (mujinjangPopup) {
+                // 오늘 그만 보기 버튼 우선 시도
+                const dismissButton = document.querySelector('[data-button-name="오늘 그만 보기"]') ||
+                                    document.querySelector('[data-button-id="dismisstoday"]');
+                if (dismissButton) {
+                    dismissButton.click();
+                    removedCount++;
+                    removedElements.push('무진장 팝업 (버튼 클릭)');
+                } else {
+                    // 팝업 컨테이너 찾아서 제거
+                    let container = mujinjangPopup;
+                    while (container && container.parentElement) {
+                        const style = window.getComputedStyle(container);
+                        if (style.position === 'fixed' || style.position === 'absolute' || 
+                            container.classList.contains('modal') || container.classList.contains('popup')) {
+                            break;
+                        }
+                        container = container.parentElement;
+                    }
+                    if (container) {
+                        container.style.display = 'none';
+                        container.remove();
+                        removedCount++;
+                        removedElements.push('무진장 팝업 (강제 제거)');
+                    }
+                }
+            }
+            
+            // 3-2. 일반 팝업 선택자로 제거
+            const popupSelectors = [
+                '.modal:not([style*="display: none"])',
+                '.popup:not([style*="display: none"])',
+                '.layer-popup:not([style*="display: none"])',
+                '.modal-backdrop',
+                '.overlay',
+                '[role="dialog"]',
+                '[aria-modal="true"]',
+                '.coupon-popup',
+                '.event-popup',
+                '.promotion-popup'
+            ];
+            
+            popupSelectors.forEach(selector => {
+                const elements = document.querySelectorAll(selector);
+                elements.forEach(elem => {
+                    elem.style.display = 'none';
+                    elem.remove();
+                    removedCount++;
+                    removedElements.push(`선택자: ${selector}`);
+                });
+            });
+            
+            // 3-3. z-index 기반 팝업 감지 및 제거
+            const allElements = document.querySelectorAll('*');
+            allElements.forEach(elem => {
+                const style = window.getComputedStyle(elem);
+                const zIndex = parseInt(style.zIndex);
+                const position = style.position;
+                
+                // 높은 z-index + fixed/absolute 포지션 = 팝업일 가능성 높음
+                if (zIndex > 9999 && (position === 'fixed' || position === 'absolute')) {
+                    // 중요한 요소가 아닌지 확인
+                    const tagName = elem.tagName.toLowerCase();
+                    const isImportant = tagName === 'header' || tagName === 'nav' || 
+                                       elem.id === 'header' || elem.classList.contains('header');
+                    
+                    if (!isImportant) {
+                        elem.style.display = 'none';
+                        elem.remove();
+                        removedCount++;
+                        removedElements.push(`z-index: ${zIndex}`);
+                    }
+                }
+            });
+            
+            // 3-4. iframe 내부 팝업 처리
+            const iframes = document.querySelectorAll('iframe');
+            iframes.forEach(iframe => {
+                try {
+                    const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+                    if (iframeDoc) {
+                        // iframe 내부에서도 팝업 제거
+                        const iframePopups = iframeDoc.querySelectorAll('.modal, .popup, .overlay');
+                        iframePopups.forEach(popup => {
+                            popup.style.display = 'none';
+                            popup.remove();
+                            removedCount++;
+                            removedElements.push('iframe 팝업');
+                        });
+                    }
+                } catch (e) {
+                    // Cross-origin iframe은 접근 불가
+                    console.log('iframe 접근 불가:', e);
+                }
+            });
+            
+            // 3-5. body 스타일 복원
+            document.body.style.overflow = 'auto';
+            document.body.style.position = 'static';
+            document.documentElement.style.overflow = 'auto';
+            
+            // body에 설정된 클래스 제거 (modal-open 등)
+            document.body.classList.remove('modal-open', 'popup-open', 'no-scroll');
+            
+            return {
+                removedCount: removedCount,
+                removedElements: removedElements
+            };
+        """)
+        
+        if js_result['removedCount'] > 0:
+            removed_count += js_result['removedCount']
+            methods_used.append("JavaScript 강화 실행")
+            print(f"{worker_prefix}JavaScript로 {js_result['removedCount']}개 팝업 제거")
+        
+        # 4. CSS 셀렉터로 추가 팝업 제거 (기존 방식 보완)
+        popup_selectors = [
+            # 무진장 팝업 관련
+            "button[data-button-name='오늘 그만 보기']",
+            "[data-button-id='dismisstoday']",
+            "button[data-button-name='닫기']",
+            
+            # 새로운 셀렉터 추가
+            "button[data-testid='popup-close']",
+            "[data-dismiss='popup']",
+            "a.popup-close",
+            "div.popup-close-btn",
+            
+            # 기존 셀렉터
+            "button[aria-label='Close']",
+            "button[aria-label='닫기']",
+            "button.close-button",
+            "button.modal-close",
+            "button.popup-close",
+            ".close-btn",
+            ".btn-close"
+        ]
+        
+        for selector in popup_selectors:
+            try:
+                close_buttons = driver.find_elements(By.CSS_SELECTOR, selector)
+                for button in close_buttons:
+                    if button.is_displayed() and button.is_enabled():
+                        try:
+                            driver.execute_script("arguments[0].click();", button)
+                            removed_count += 1
+                            methods_used.append(f"CSS 셀렉터: {selector}")
+                            time.sleep(0.05)  # 짧은 대기
+                        except:
+                            pass
+            except:
+                continue
+        
+        # 5. 팝업 제거 검증
+        time.sleep(0.2)  # DOM 업데이트 대기
+        
+        verification_result = driver.execute_script("""
+            // 팝업이 실제로 제거되었는지 확인
+            const popupSelectors = [
+                '.modal:not([style*="display: none"])',
+                '.popup:not([style*="display: none"])',
+                '.layer-popup:not([style*="display: none"])',
+                '[data-section-name="mujinjang_index_popup"]'
+            ];
+            
+            let remainingPopups = 0;
+            popupSelectors.forEach(selector => {
+                const elements = document.querySelectorAll(selector);
+                elements.forEach(elem => {
+                    if (elem.offsetParent !== null) {  // 실제로 보이는지 확인
+                        remainingPopups++;
+                    }
+                });
+            });
+            
+            // body 스크롤 가능한지 확인
+            const bodyScrollable = window.getComputedStyle(document.body).overflow !== 'hidden';
+            
+            return {
+                remainingPopups: remainingPopups,
+                bodyScrollable: bodyScrollable
+            };
+        """)
+        
+        # 6. 재시도 로직 (팝업이 남아있는 경우)
+        if verification_result['remainingPopups'] > 0:
+            print(f"{worker_prefix}남은 팝업 {verification_result['remainingPopups']}개 감지, 재시도...")
+            
+            # ESC 키로 닫기 시도
+            from selenium.webdriver.common.keys import Keys
+            ActionChains(driver).send_keys(Keys.ESCAPE).perform()
+            time.sleep(0.1)
+            
+            # 다시 검증
+            final_check = driver.execute_script("""
+                return document.querySelectorAll('.modal:not([style*="display: none"]), .popup:not([style*="display: none"])').length;
+            """)
+            
+            if final_check < verification_result['remainingPopups']:
+                removed_count += verification_result['remainingPopups'] - final_check
+                methods_used.append("ESC 키")
+        
+        # 결과 로깅
+        if removed_count > 0:
+            print(f"{worker_prefix}✅ 총 {removed_count}개 팝업 제거 완료")
+            print(f"{worker_prefix}사용된 방법: {', '.join(methods_used)}")
+        else:
+            print(f"{worker_prefix}팝업이 감지되지 않았습니다")
+        
+        return {
+            'closed': removed_count > 0,
+            'removed_count': removed_count,
+            'methods_used': methods_used,
+            'body_scrollable': verification_result.get('bodyScrollable', True)
+        }
+        
+    except Exception as e:
+        print(f"{worker_prefix}향상된 팝업 처리 중 오류: {e}")
+        import traceback
+        traceback.print_exc()
+        
+        # 오류 발생 시 기본 팝업 제거 함수 호출
+        print(f"{worker_prefix}기본 팝업 제거 함수로 폴백...")
+        basic_result = close_musinsa_popup(driver, worker_id)
+        
+        return {
+            'closed': basic_result,
+            'removed_count': 1 if basic_result else 0,
+            'methods_used': ['기본 함수 폴백'],
+            'body_scrollable': True
+        }
+
+
 class MusinsaWorker:
     """개별 워커 프로세스"""
     def __init__(self, worker_id, headless=True):
@@ -805,7 +1125,15 @@ class MusinsaWorker:
                 pass
             
             # 팝업 처리
-            close_musinsa_popup(self.driver, self.worker_id)
+            popup_result = enhanced_close_musinsa_popup(self.driver, self.worker_id)
+            
+            # 팝업 제거 실패 시 로깅
+            if not popup_result['closed'] and popup_result['removed_count'] == 0:
+                print(f"[Worker {self.worker_id}] ⚠️ 팝업이 감지되지 않았거나 제거 실패")
+            
+            # body 스크롤 불가능한 경우 경고
+            if not popup_result.get('body_scrollable', True):
+                print(f"[Worker {self.worker_id}] ⚠️ 페이지 스크롤이 막혀있을 수 있습니다")
             
             # 로그인 체크
             if "login" in self.driver.current_url.lower():

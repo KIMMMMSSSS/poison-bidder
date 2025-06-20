@@ -19,6 +19,10 @@ from collections import defaultdict
 from multiprocessing import Manager, Process
 from typing import List, Dict, Any, Optional, Tuple
 
+# 무신사 로그인 관련 imports
+from login_manager import LoginManager
+from dotenv import load_dotenv
+
 # Selenium imports
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -49,6 +53,18 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# 환경변수 로드
+load_dotenv()
+
+# 무신사 로그인 계정 정보
+MUSINSA_ID = os.getenv('MUSINSA_ID')
+MUSINSA_PASSWORD = os.getenv('MUSINSA_PASSWORD')
+
+# 환경변수 누락 확인
+if not MUSINSA_ID or not MUSINSA_PASSWORD:
+    logger.warning("[경고] 무신사 로그인 정보가 환경변수에 설정되지 않았습니다.")
+    logger.warning("MUSINSA_ID와 MUSINSA_PASSWORD를 .env 파일에 설정해주세요.")
+
 # 설정 상수 (원본 파일에서 복사)
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 LOGFILE = os.path.join(CURRENT_DIR, "poizon_bid_fail_log.txt")
@@ -66,6 +82,20 @@ BRAND_SEARCH_RULES = {
     "반스": "remove_last_1",      # VN0001 → VN000
     "살로몬": "remove_L_and_00",  # L12345600 → 123456
     "SALOMON": "remove_L_and_00",  # 대문자도 지원
+}
+
+# 브랜드별 사이즈 형식 (예: 아식스의 경우 "2E-Width JP 24.5" 형식)
+BRAND_SIZE_FORMATS = {
+    "아식스": {
+        "JP": "Width JP",  # "2E-Width JP 24.5"에서 "JP 24.5" 패턴 매칭
+        "US": "Width US"   # 필요시 US 형식도 추가 가능
+    },
+    "ASICS": {  # 영문명도 지원
+        "JP": "Width JP",
+        "US": "Width US"
+    }
+    # 다른 브랜드의 특수 형식도 여기에 추가
+    # 예: "뉴발란스": {"JP": "JPN", "US": "US Men"}
 }
 
 # 색상 매핑 테이블 (무신사 → Poizon)
@@ -153,7 +183,7 @@ def log_processor_worker(result_queue, result_list_queue):
             continue
 
 
-def worker_process_wrapper(worker_id, task_queue, result_queue, status_dict, login_complete, min_profit, driver_path, stats):
+def worker_process_wrapper(worker_id, task_queue, result_queue, status_dict, login_complete, min_profit, driver_path, stats, musinsa_cookies=None):
     """워커 프로세스 래퍼 (모듈 레벨 함수)"""
     bidder = None
     try:
@@ -163,6 +193,15 @@ def worker_process_wrapper(worker_id, task_queue, result_queue, status_dict, log
         # PoizonAutoBidderWorker 인스턴스 생성
         bidder = PoizonAutoBidderWorker(worker_id, result_queue, status_dict)
         bidder.min_profit = min_profit
+        
+        # 무신사 어댑터 초기화 (무신사 쿠키가 있는 경우)
+        musinsa_adapter = None
+        if musinsa_cookies:
+            result_queue.put(("LOG", f"[Worker {worker_id}] 무신사 어댑터 초기화"))
+            # PoizonBidderWrapperV2 인스턴스가 필요함
+            # 여기서는 간단히 None을 전달하고 나중에 수정
+            musinsa_adapter = MusinsaBidderAdapter(worker_id, result_queue, None)
+            musinsa_adapter.set_musinsa_cookies(musinsa_cookies)
         
         # Chrome 옵션 설정
         result_queue.put(("LOG", f"[Worker {worker_id}] Chrome 드라이버 초기화 시작..."))
@@ -522,6 +561,54 @@ def worker_process_wrapper(worker_id, task_queue, result_queue, status_dict, log
     finally:
         if bidder and bidder.driver:
             bidder.driver.quit()
+
+
+# 무신사 입찰 어댑터 클래스
+class MusinsaBidderAdapter:
+    """무신사 상품을 포이즌 입찰 시스템에서 처리하기 위한 어댑터"""
+    
+    def __init__(self, worker_id, result_queue, wrapper_instance):
+        self.worker_id = worker_id
+        self.result_queue = result_queue
+        self.wrapper = wrapper_instance
+        self.musinsa_cookies = None
+        
+    def log_to_queue(self, message):
+        """큐를 통한 로그 전송"""
+        self.result_queue.put(("LOG", f"[Worker {self.worker_id}] [무신사] {message}"))
+    
+    def set_musinsa_cookies(self, cookies):
+        """무신사 쿠키 설정"""
+        self.musinsa_cookies = cookies
+        self.log_to_queue("무신사 쿠키 설정 완료")
+    
+    def process_musinsa_item(self, item):
+        """무신사 상품 처리"""
+        try:
+            # 무신사 URL 확인
+            if 'url' not in item or 'musinsa.com' not in item['url']:
+                self.log_to_queue("무신사 URL이 아닙니다")
+                return None
+            
+            url = item['url']
+            self.log_to_queue(f"무신사 상품 처리 시작: {url}")
+            
+            # 최대혜택가 추출
+            max_benefit_price = self.wrapper.extract_musinsa_max_benefit_price(url)
+            
+            if max_benefit_price:
+                self.log_to_queue(f"최대혜택가 추출 성공: {max_benefit_price:,}원")
+                # 아이템 정보 업데이트
+                item['adjusted_price'] = max_benefit_price
+                item['price_source'] = 'musinsa_max_benefit'
+                return item
+            else:
+                self.log_to_queue("최대혜택가 추출 실패")
+                return None
+                
+        except Exception as e:
+            self.log_to_queue(f"무신사 상품 처리 중 오류: {e}")
+            return None
 
 
 # PoizonAutoBidderWorker 클래스 (모듈 레벨로 이동)
@@ -1444,8 +1531,10 @@ class PoizonAutoBidderWorker:
                     var targetSize = arguments[0];
                     var targetColor = arguments[1];
                     var needColorMatch = arguments[2];
+                    var activeTab = arguments[3];  // 현재 활성 탭 추가
                     
                     console.log('[DEBUG] 찾는 사이즈: ' + targetSize);
+                    console.log('[DEBUG] 현재 탭: ' + activeTab);
                     console.log('[DEBUG] 사용 가능한 아이템 수: ' + items.length);
                     
                     // 처음 5개 아이템 텍스트 표시
@@ -1491,6 +1580,23 @@ class PoizonAutoBidderWorker:
                             var pattern2 = ' ' + targetSize;        // 뒤에만 공백
                             var pattern3 = targetSize + ' ';        // 앞에만 공백
                             
+                            // JP 탭 특수 처리 추가
+                            if (activeTab === 'JP') {
+                                var jpPattern = 'JP ' + targetSize;  // 'JP 22.5' 형식
+                                if (text.indexOf(jpPattern) !== -1) {
+                                    console.log('[DEBUG] JP 패턴 매칭 성공: ' + text);
+                                    // 색상 체크 (필요한 경우만)
+                                    if (needColorMatch && targetColor) {
+                                        if (!text.includes(targetColor)) {
+                                            console.log('[DEBUG] 색상 불일치: ' + text + ' (필요 색상: ' + targetColor + ')');
+                                            continue;
+                                        }
+                                    }
+                                    console.log('[DEBUG] JP 패턴 최종 매칭 성공: ' + text);
+                                    return item;
+                                }
+                            }
+                            
                             if (text.indexOf(pattern1) !== -1 || 
                                 text.endsWith(pattern2) || 
                                 text.startsWith(pattern3) ||
@@ -1510,7 +1616,7 @@ class PoizonAutoBidderWorker:
                         }
                     }
                     return null;
-                """, target_size, target_color, len(available['colors']) > 1)
+                """, target_size, target_color, len(available['colors']) > 1, active_tab)
                 
                 if matching_item:
                     # 동일 사이즈 중복 체크 (EU 다른 경우)
@@ -1545,8 +1651,10 @@ class PoizonAutoBidderWorker:
                             var targetSize = arguments[0];
                             var targetColor = arguments[1];
                             var needColorMatch = arguments[2];
+                            var activeTab = arguments[3];
                             
                             console.log('[DEBUG] 재시도 - 찾는 사이즈: ' + targetSize);
+                            console.log('[DEBUG] 재시도 - 현재 탭: ' + activeTab);
                             
                             for (var i = 0; i < items.length; i++) {
                                 var item = items[i];
@@ -1557,6 +1665,22 @@ class PoizonAutoBidderWorker:
                                 var pattern1 = ' ' + targetSize + ' ';
                                 var pattern2 = ' ' + targetSize;
                                 var pattern3 = targetSize + ' ';
+                                
+                                // JP 탭 특수 처리 추가 (재시도에서도)
+                                if (activeTab === 'JP') {
+                                    var jpPattern = 'JP ' + targetSize;
+                                    if (text.indexOf(jpPattern) !== -1) {
+                                        console.log('[DEBUG] 재시도 JP 패턴 매칭 성공: ' + text);
+                                        if (needColorMatch && targetColor) {
+                                            if (!text.includes(targetColor)) {
+                                                console.log('[DEBUG] 재시도 색상 불일치: ' + text);
+                                                continue;
+                                            }
+                                        }
+                                        console.log('[DEBUG] 재시도 JP 패턴 최종 매칭 성공: ' + text);
+                                        return item;
+                                    }
+                                }
                                 
                                 if (text.indexOf(pattern1) !== -1 || 
                                     text.endsWith(pattern2) || 
@@ -1574,7 +1698,7 @@ class PoizonAutoBidderWorker:
                                 }
                             }
                             return null;
-                        """, target_size_converted, target_color, len(available['colors']) > 1)
+                        """, target_size_converted, target_color, len(available['colors']) > 1, active_tab)
                         
                         if matching_item:
                             item_text = matching_item.text.strip()
@@ -1597,15 +1721,60 @@ class PoizonAutoBidderWorker:
                         self.log_to_queue(f"[ERROR] 재시도 JavaScript 매칭 실패: {type(e).__name__}")
                 
                 if not found:
-                    self.log_to_queue(f"[FAIL] {active_tab} 탭에서 {size} 찾기 실패")
+                    self.log_to_queue(f"\n[FAIL] {active_tab} 탭에서 {size} 찾기 실패")
+                    
+                    # 상세 디버그 정보 출력
+                    self.log_to_queue(f"[DEBUG] ===== 매칭 실패 상세 정보 =====")
+                    self.log_to_queue(f"[DEBUG] 브랜드: {brand}")
+                    self.log_to_queue(f"[DEBUG] 원본 사이즈: {size}")
+                    self.log_to_queue(f"[DEBUG] 타겟 사이즈: {target_size}")
+                    
+                    # 시도한 패턴들 기록
+                    tried_patterns = [
+                        f"' {target_size} ' (공백으로 둘러싸인)",
+                        f"' {target_size}' (뒤에만 공백)",
+                        f"'{target_size} ' (앞에만 공백)",
+                        f"'{target_size}' (정확히 일치)"
+                    ]
+                    
+                    # JP 탭인 경우 JP 패턴도 추가
+                    if active_tab == 'JP':
+                        tried_patterns.append(f"'JP {target_size}' (JP 특수 패턴)")
+                        # 변환된 사이즈도 시도했다면 추가
+                        if 'target_size_converted' in locals() and target_size != target_size_original:
+                            tried_patterns.append(f"'{target_size_original}' (원본 사이즈)")
+                            tried_patterns.append(f"'JP {target_size_original}' (JP 원본 패턴)")
+                    
+                    self.log_to_queue(f"[DEBUG] 시도한 패턴들:")
+                    for pattern in tried_patterns:
+                        self.log_to_queue(f"  - {pattern}")
+                    
+                    # 사용 가능한 사이즈 10개 표시
+                    self.log_to_queue(f"\n[DEBUG] 사용 가능한 사이즈 (최대 10개):")
+                    available_sizes = []
+                    for i, item in enumerate(all_items[:10]):
+                        item_text = item.text.strip()
+                        self.log_to_queue(f"  {i+1}. {item_text}")
+                        available_sizes.append(item_text)
+                    
                     # 비슷한 사이즈 찾기 (디버깅용)
                     similar_items = []
                     for item in all_items[:20]:  # 처음 20개만 확인
                         item_text = item.text.strip()
+                        # 타겟 사이즈나 원본 사이즈가 포함된 경우
                         if target_size in item_text or size in item_text:
                             similar_items.append(item_text)
+                        # 4자리 사이즈의 경우 두 버전 모두 확인
+                        elif len(size) == 4 and size.isdigit():
+                            if size[:3] in item_text:  # 2552 -> 255
+                                similar_items.append(item_text)
+                    
                     if similar_items:
-                        self.log_to_queue(f"[DEBUG] 비슷한 아이템들: {similar_items[:5]}")
+                        self.log_to_queue(f"\n[DEBUG] 비슷한 사이즈 포함 아이템:")
+                        for item in similar_items[:5]:
+                            self.log_to_queue(f"  - {item}")
+                    
+                    self.log_to_queue(f"[DEBUG] ==============================\n")
                     self.log_fail(idx, brand_name, code, color, size, cost, f"{active_tab}탭매칭실패")
         
         self.log_to_queue(f"\n[완료] 매칭: {len(matched)}/{len(entries)}")
@@ -2028,7 +2197,17 @@ def load_cookies(driver):
 
 
 class PoizonBidderWrapperV2:
-    """포이즌 입찰 래퍼 V2 - 원본 파일의 실제 로직 활용"""
+    """포이즌 입찰 래퍼 V2 - 원본 파일의 실제 로직 활용
+    
+    주요 기능:
+    - 포이즌 자동 입찰 시스템 통합
+    - ABC마트 상품 링크 추출 (페이지네이션 지원)
+    - 상품 수 급감 시 자동 크롤링 종료 기능
+    """
+    
+    # ABC마트 크롤러 설정
+    MIN_PAGES_FOR_THRESHOLD = 3  # 임계값 적용을 위한 최소 페이지 수
+    PRODUCT_DROP_THRESHOLD = 0.2  # 상품 수 급감 판단 임계값 (20%)
     
     def __init__(self, driver_path: str = None, min_profit: int = 0, worker_count: int = 5):
         """
@@ -2043,6 +2222,7 @@ class PoizonBidderWrapperV2:
         self.min_profit = min_profit
         self.worker_count = worker_count
         self.module = None
+        self.musinsa_login_mgr = None  # 무신사 로그인 매니저
         
         # 원본 모듈 로드
         self._load_original_module()
@@ -2116,6 +2296,331 @@ class PoizonBidderWrapperV2:
         except Exception as e:
             logger.error(f"원본 모듈 로드 실패: {e}")
             raise
+    
+    def ensure_musinsa_login(self):
+        """무신사 로그인 확인 및 실행"""
+        try:
+            # 환경변수 확인
+            if not MUSINSA_ID or not MUSINSA_PASSWORD:
+                logger.error("무신사 로그인 정보가 환경변수에 설정되지 않았습니다.")
+                logger.error("MUSINSA_ID와 MUSINSA_PASSWORD를 .env 파일에 설정해주세요.")
+                return False
+            
+            # 로그인 매니저 초기화
+            if not self.musinsa_login_mgr:
+                logger.info("무신사 로그인 매니저 초기화")
+                self.musinsa_login_mgr = LoginManager('musinsa')
+            
+            # 자동 로그인 시도
+            logger.info("무신사 자동 로그인 시도")
+            if self.musinsa_login_mgr.auto_login(MUSINSA_ID, MUSINSA_PASSWORD):
+                logger.info("무신사 자동 로그인 성공")
+                # 쿠키 저장
+                self.musinsa_login_mgr.save_cookies()
+                
+                # 팝업 처리 추가
+                logger.info("무신사 팝업 처리 시도")
+                try:
+                    popup_result = self.musinsa_login_mgr.handle_musinsa_popup()
+                    if popup_result:
+                        logger.info("무신사 팝업 처리 성공")
+                    else:
+                        logger.warning("무신사 팝업이 없거나 처리하지 못했습니다")
+                except Exception as e:
+                    logger.warning(f"무신사 팝업 처리 중 오류 (무시하고 계속): {e}")
+                
+                return True
+            else:
+                logger.warning("무신사 자동 로그인 실패 - 수동 로그인 필요")
+                # 수동 로그인 시도
+                if self.musinsa_login_mgr.manual_login():
+                    logger.info("무신사 수동 로그인 성공")
+                    # 쿠키 저장
+                    self.musinsa_login_mgr.save_cookies()
+                    
+                    # 팝업 처리 추가
+                    logger.info("무신사 팝업 처리 시도")
+                    try:
+                        popup_result = self.musinsa_login_mgr.handle_musinsa_popup()
+                        if popup_result:
+                            logger.info("무신사 팝업 처리 성공")
+                        else:
+                            logger.warning("무신사 팝업이 없거나 처리하질 못했습니다")
+                    except Exception as e:
+                        logger.warning(f"무신사 팝업 처리 중 오류 (무시하고 계속): {e}")
+                    
+                    return True
+                else:
+                    logger.error("무신사 수동 로그인 실패")
+                    return False
+        except Exception as e:
+            logger.error(f"무신사 로그인 중 오류 발생: {e}")
+            return False
+    
+    def get_musinsa_cookies(self):
+        """무신사 쿠키 반환"""
+        try:
+            if self.musinsa_login_mgr:
+                return self.musinsa_login_mgr.cookies
+            else:
+                logger.warning("무신사 로그인 매니저가 초기화되지 않았습니다.")
+                return None
+        except Exception as e:
+            logger.error(f"무신사 쿠키 반환 중 오류: {e}")
+            return None
+    
+    def extract_musinsa_max_benefit_price(self, url):
+        """무신사 상품 페이지에서 최대혜택가 추출"""
+        driver = None
+        try:
+            logger.info(f"무신사 최대혜택가 추출 시작: {url}")
+            
+            # 로그인 상태 확인 및 로그인
+            if not self.ensure_musinsa_login():
+                logger.error("무신사 로그인 실패")
+                return None
+            
+            # Chrome 드라이버 설정
+            chrome_options = webdriver.ChromeOptions()
+            chrome_options.add_argument('--start-maximized')
+            chrome_options.add_argument('--no-sandbox')
+            chrome_options.add_argument('--disable-dev-shm-usage')
+            chrome_options.add_argument('--disable-gpu')
+            chrome_options.add_argument('--log-level=3')
+            chrome_options.add_argument('--disable-blink-features=AutomationControlled')
+            chrome_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36")
+            
+            # 이미지 차단으로 속도 최적화
+            chrome_options.add_experimental_option("prefs", {
+                "profile.default_content_setting_values": {
+                    "images": 2,  # 이미지 차단
+                    "plugins": 2,  # 플러그인 차단
+                    "popups": 2,  # 팝업 차단
+                }
+            })
+            
+            # 드라이버 생성
+            try:
+                from webdriver_manager.chrome import ChromeDriverManager
+                driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
+            except:
+                driver = webdriver.Chrome(service=Service(self.driver_path), options=chrome_options)
+            
+            wait = WebDriverWait(driver, 10)
+            
+            # 쿠키 로드
+            cookies = self.get_musinsa_cookies()
+            if cookies:
+                driver.get("https://www.musinsa.com")
+                time.sleep(1)
+                for cookie in cookies:
+                    try:
+                        driver.add_cookie(cookie)
+                    except:
+                        pass
+                driver.refresh()
+                time.sleep(1)
+                logger.info("무신사 쿠키 로드 완료")
+            
+            # 상품 페이지 접속
+            driver.get(url)
+            
+            # 팝업 처리 (무진장 이벤트 팝업 등)
+            time.sleep(2)  # 팝업이 나타날 시간을 줌
+            popup_handled = False
+            
+            # 입장하기 팝업 처리
+            try:
+                # 입장하기 버튼 찾기
+                entry_button = driver.find_element(
+                    By.XPATH, 
+                    "//button[contains(@class, 'sc-74232346-0') and .//span[text()='입장하기']]"
+                )
+                if entry_button.is_displayed():
+                    logger.info("무진장 이벤트 팝업 발견 - 입장하기 클릭")
+                    driver.execute_script("arguments[0].click();", entry_button)
+                    popup_handled = True
+                    time.sleep(1)
+            except NoSuchElementException:
+                pass
+            except Exception as e:
+                logger.warning(f"입장하기 팝업 처리 중 예외: {e}")
+            
+            # 오늘 그만 보기 옵션으로 팝업 처리 (입장하기가 실패한 경우)
+            if not popup_handled:
+                try:
+                    dismiss_button = driver.find_element(
+                        By.XPATH,
+                        "//button[contains(@class, 'sc-37768b80-12') and text()='오늘 그만 보기']"
+                    )
+                    if dismiss_button.is_displayed():
+                        logger.info("무진장 이벤트 팝업 발견 - 오늘 그만 보기 클릭")
+                        driver.execute_script("arguments[0].click();", dismiss_button)
+                        popup_handled = True
+                        time.sleep(1)
+                except NoSuchElementException:
+                    pass
+                except Exception as e:
+                    logger.warning(f"오늘 그만 보기 팝업 처리 중 예외: {e}")
+            
+            # 기타 일반 팝업 처리 (X 버튼)
+            try:
+                close_buttons = driver.find_elements(
+                    By.XPATH,
+                    "//button[contains(@class, 'close') or contains(@aria-label, 'close') or contains(@aria-label, '닫기')]"
+                )
+                for close_btn in close_buttons:
+                    if close_btn.is_displayed():
+                        logger.info("일반 팝업 닫기 버튼 발견")
+                        driver.execute_script("arguments[0].click();", close_btn)
+                        popup_handled = True
+                        time.sleep(0.5)
+                        break
+            except Exception as e:
+                logger.warning(f"일반 팝업 처리 중 예외: {e}")
+            
+            if popup_handled:
+                logger.info("팝업 처리 완료")
+            
+            # 페이지 로드 대기
+            try:
+                wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "div.sc-x9uktx-0.WoXHk")))
+                wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "span.text-red.text-title_18px_semi")))
+            except TimeoutException:
+                logger.warning("최대혜택가 영역 로드 타임아웃")
+            
+            # 로그인 체크
+            if "login" in driver.current_url.lower():
+                logger.error("로그인 페이지로 리다이렉트됨")
+                return None
+            
+            # 가격 추출
+            price_text = None
+            
+            # 방법 1: JavaScript로 직접 추출
+            try:
+                price_text = driver.execute_script("""
+                    const section = document.querySelector('.sc-x9uktx-0.WoXHk');
+                    if (section) {
+                        const spans = section.querySelectorAll('span.text-red.text-title_18px_semi');
+                        for (let span of spans) {
+                            if (span.textContent.includes('원') && !span.textContent.includes('%')) {
+                                return span.textContent;
+                            }
+                        }
+                    }
+                    return null;
+                """)
+                
+                if price_text:
+                    logger.info(f"JavaScript로 가격 추출: {price_text}")
+            except Exception as e:
+                logger.warning(f"JavaScript 실행 실패: {e}")
+            
+            # 방법 2: XPath로 추출
+            if not price_text:
+                try:
+                    max_benefit_section = wait.until(
+                        EC.presence_of_element_located((By.XPATH, "//div[@class='sc-x9uktx-0 WoXHk']"))
+                    )
+                    price_elem = max_benefit_section.find_element(
+                        By.XPATH, 
+                        ".//span[contains(@class, 'text-red') and contains(@class, 'text-title_18px_semi') and contains(text(), '원') and not(contains(text(), '%'))]"
+                    )
+                    
+                    WebDriverWait(driver, 10).until(
+                        lambda d: price_elem.text.strip() != "" and "원" in price_elem.text
+                    )
+                    
+                    price_text = price_elem.text.strip()
+                    logger.info(f"XPath로 가격 추출: {price_text}")
+                except Exception as e:
+                    logger.warning(f"XPath 추출 실패: {e}")
+            
+            # 가격 텍스트 처리
+            if price_text:
+                # 가격에서 숫자만 추출
+                current_price = int(re.sub(r'[^\d]', '', price_text))
+                
+                # 적립금 선할인 체크
+                try:
+                    buttons = driver.find_elements(By.CSS_SELECTOR, "button.sc-qexya5-0")
+                    pre_discount_amount = 0
+                    
+                    for button in buttons:
+                        try:
+                            button_text = button.text
+                            if "적립금 선할인" in button_text:
+                                parent_div = button.find_element(By.XPATH, "./ancestor::div[contains(@class, 'flex-row')]")
+                                if parent_div:
+                                    checkbox_svg = parent_div.find_element(By.CSS_SELECTOR, "svg")
+                                    if checkbox_svg and checkbox_svg.get_attribute("data-icon") == "square-check":
+                                        logger.info("적립금 선할인이 체크되어 있음")
+                                        
+                                        # 버튼 클릭해서 상세 정보 보기
+                                        button.click()
+                                        time.sleep(0.5)
+                                        
+                                        # 적립금 금액 찾기
+                                        amount_elems = driver.find_elements(By.XPATH, "//span[contains(text(), '적용 적립금')]/following-sibling::span")
+                                        for elem in amount_elems:
+                                            text = elem.text.strip()
+                                            if "원" in text:
+                                                amount = int(re.sub(r'[^\d]', '', text))
+                                                if amount > 0:
+                                                    pre_discount_amount = amount
+                                                    logger.info(f"적립금 선할인 금액: {amount}원")
+                                                    break
+                                        
+                                        # 자세히 닫기
+                                        try:
+                                            close_button = driver.find_element(
+                                                By.XPATH,
+                                                "//div[@data-button-name='혜택확인닫기']//span[text()='닫기']/.."
+                                            )
+                                            driver.execute_script("arguments[0].click();", close_button)
+                                        except:
+                                            pass
+                                        
+                                        break
+                        except:
+                            continue
+                    
+                    # 적립금 선할인이 적용된 경우, 원래 가격으로 복원
+                    if pre_discount_amount > 0:
+                        original_price = current_price + pre_discount_amount
+                        logger.info(f"최대혜택가: {current_price}원 + 선할인 {pre_discount_amount}원 = {original_price}원")
+                        return original_price
+                        
+                except Exception as e:
+                    logger.warning(f"적립금 선할인 확인 실패: {e}")
+                
+                logger.info(f"최대혜택가: {current_price}원")
+                return current_price
+                
+            else:
+                logger.warning("최대혜택가 텍스트를 찾을 수 없음")
+                
+                # 대안: 정가 추출 시도
+                try:
+                    price_elem = driver.find_element(By.XPATH, "//span[contains(@class, 'text-title_18px_semi') and contains(text(), '원')]")
+                    current_price_text = price_elem.text.strip()
+                    current_price = int(re.sub(r'[^\d]', '', current_price_text))
+                    logger.info(f"정가: {current_price}원")
+                    return current_price
+                except:
+                    logger.error("가격을 찾을 수 없습니다")
+                    return None
+                    
+        except Exception as e:
+            logger.error(f"무신사 가격 추출 중 오류 발생: {e}")
+            import traceback
+            traceback.print_exc()
+            return None
+        finally:
+            if driver:
+                driver.quit()
+                logger.info("드라이버 종료")
     
     def prepare_bid_data(self, items: List[Dict[str, Any]]) -> List[Tuple]:
         """
@@ -2307,13 +2812,40 @@ class PoizonBidderWrapperV2:
             log_proc.daemon = True
             log_proc.start()
             
+            # 무신사 쿠키 가져오기
+            musinsa_cookies = None
+            try:
+                # unified_items에 무신사 상품이 있는지 확인
+                has_musinsa_items = False
+                if bid_data:
+                    # 무신사 관련 상품이 있는지 확인 (브랜드나 특정 패턴으로)
+                    for item in bid_data:
+                        if len(item) > 1 and item[1]:  # 브랜드가 있는 경우
+                            # 무신사 특정 브랜드 또는 패턴 확인
+                            # 일단 모든 상품에 대해 무신사 쿠키 준비
+                            has_musinsa_items = True
+                            break
+                
+                if has_musinsa_items:
+                    logger.info("무신사 상품 감지 - 무신사 로그인 확인")
+                    if self.ensure_musinsa_login():
+                        musinsa_cookies = self.get_musinsa_cookies()
+                        if musinsa_cookies:
+                            logger.info("무신사 쿠키 준비 완료")
+                        else:
+                            logger.warning("무신사 쿠키를 가져올 수 없습니다")
+                    else:
+                        logger.warning("무신사 로그인 실패")
+            except Exception as e:
+                logger.error(f"무신사 쿠키 준비 중 오류: {e}")
+            
             # 워커 프로세스들 시작 (worker_process_wrapper 사용)
             workers = []
             for i in range(1, self.worker_count + 1):
                 worker = Process(
                     target=worker_process_wrapper,
                     args=(i, task_queue, result_queue, status_dict, login_complete, 
-                          self.min_profit, self.driver_path, stats)
+                          self.min_profit, self.driver_path, stats, musinsa_cookies)
                 )
                 workers.append(worker)
                 worker.start()
@@ -2420,6 +2952,9 @@ class PoizonBidderWrapperV2:
             # 추출된 링크들을 저장할 세트 (중복 제거)
             all_links = set()
             
+            # 페이지별 새로운 링크 수 기록 (크롤링 종료 판단용)
+            new_links_history = []
+            
             # URL 인코딩된 검색어
             encoded_keyword = urllib.parse.quote(search_keyword)
             
@@ -2467,6 +3002,16 @@ class PoizonBidderWrapperV2:
                     all_links.update(page_links)
                     
                     logger.info(f"페이지 {page}: {len(new_links)}개 새 링크 발견 (전체: {len(all_links)}개)")
+                    
+                    # 페이지별 새 링크 수 기록
+                    new_links_history.append(len(new_links))
+                    
+                    # 상품 수 급감 감지 로직
+                    if page >= self.MIN_PAGES_FOR_THRESHOLD and len(new_links_history) >= 3:
+                        recent_avg = sum(new_links_history[-3:]) / 3
+                        if recent_avg > 0 and len(new_links) < recent_avg * self.PRODUCT_DROP_THRESHOLD:
+                            logger.info(f"상품 수 급감 감지: 평균 {recent_avg:.1f}개 → 현재 {len(new_links)}개, 크롤링 종료")
+                            break
                     
                     # 상품이 없으면 종료
                     if len(page_links) == 0:
