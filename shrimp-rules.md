@@ -5,6 +5,8 @@
 - **기술 스택**: Python 3.11+, Selenium, undetected_chromedriver, multiprocessing
 - **핵심 모듈**: 스크래퍼(musinsa/abcmart) → 통합 입찰(poison_integrated_bidding) → 포이즌 API
 - **주요 데이터 흐름**: 스크래퍼 → JSON 파일 → auto_bidding/unified_bidding → poison_integrated_bidding → poison_bidder_wrapper_v2
+- **프로젝트 루트**: `C:\poison_final`
+- **웹사이트 루트**: `http://localhost` (C:\poison_final을 가리킴)
 
 ## 필수 준수 규칙
 
@@ -82,6 +84,178 @@
       return []
   ```
 
+## 웹 스크래핑 팝업 처리 규칙 ⚠️ CRITICAL
+
+### 무신사 팝업 처리
+- **필수**: 페이지 로드 후 팝업 체크 및 제거
+- **구현 위치**: `musinsa_scraper_improved.py`의 `close_musinsa_popup` 함수
+- **팝업 처리 순서**:
+  1. JavaScript로 즉시 팝업 감지/제거 시도
+  2. CSS 셀렉터로 다양한 팝업 유형 확인
+  3. ESC 키로 팝업 닫기 (마지막 수단)
+- **팝업 셀렉터 목록**:
+  ```python
+  popup_selectors = [
+      # 모달 닫기 버튼들
+      "button[aria-label='Close']",
+      "button[aria-label='닫기']",
+      "button.close-button",
+      "button.modal-close",
+      "button.popup-close",
+      ".close-btn",
+      ".btn-close",
+      "[data-dismiss='modal']",
+      
+      # 쿠폰/이벤트 팝업
+      ".coupon-popup .close",
+      ".event-popup .close",
+      ".promotion-popup .close",
+      
+      # 무신사 특정 팝업
+      ".layer-popup .btn-close",
+      ".popup-container .close",
+      "[data-mds='IconButton'][aria-label*='close']"
+  ]
+  ```
+- **JavaScript 우선 처리**:
+  ```python
+  # JavaScript로 팝업 즉시 제거
+  driver.execute_script("""
+      // 모든 모달 찾기
+      var modals = document.querySelectorAll('.modal, .popup, .layer-popup');
+      modals.forEach(function(modal) {
+          if (modal.style.display !== 'none') {
+              modal.style.display = 'none';
+              modal.remove();
+          }
+      });
+      
+      // 모달 백드롭 제거
+      var backdrops = document.querySelectorAll('.modal-backdrop, .overlay');
+      backdrops.forEach(function(backdrop) {
+          backdrop.remove();
+      });
+  """)
+  ```
+
+### 팝업 처리 모범 사례
+- **재시도 로직**: 팝업이 동적으로 나타날 수 있으므로 재시도 필요
+- **워커별 로깅**: `[Worker {worker_id}] 팝업 처리 성공/실패` 형식
+- **성능 최적화**: 팝업 체크는 페이지 로드 직후 1회만 수행
+- **예외 처리**: 팝업 처리 실패가 전체 프로세스를 중단시키지 않도록 함
+
+## 로그인 관리 규칙 ⚠️ CRITICAL
+
+### 로그인 정보 관리
+- **금지**: 로그인 정보 하드코딩
+- **필수**: 환경변수 또는 config 파일 사용
+- **예시**:
+  ```python
+  # .env 파일
+  MUSINSA_ID=your_id
+  MUSINSA_PASSWORD=your_password
+  POISON_PHONE=your_phone
+  POISON_PASSWORD=your_password
+  
+  # 코드에서 사용
+  import os
+  from dotenv import load_dotenv
+  load_dotenv()
+  
+  musinsa_id = os.getenv('MUSINSA_ID')
+  musinsa_password = os.getenv('MUSINSA_PASSWORD')
+  ```
+
+### 무신사 자동 로그인 구현
+- **필수 처리 필드**:
+  - `cipherKey`: 암호화 키
+  - `csrfToken`: CSRF 토큰
+  - `encryptMemberId`: 암호화된 ID
+  - `encryptPassword`: 암호화된 비밀번호
+- **구현 예시**:
+  ```python
+  # 폼 데이터 추출
+  cipher_key = driver.find_element(By.ID, "cipherKey").get_attribute("value")
+  csrf_token = driver.find_element(By.ID, "csrfToken").get_attribute("value")
+  
+  # JavaScript로 암호화 처리
+  driver.execute_script("""
+      // 무신사 암호화 함수 호출
+      document.getElementById('encryptMemberId').value = encrypt(arguments[0]);
+      document.getElementById('encryptPassword').value = encrypt(arguments[1]);
+  """, username, password)
+  
+  # 자동 로그인 체크
+  auto_login_checkbox = driver.find_element(By.ID, "login-v2-member__util__login-auto")
+  if not auto_login_checkbox.is_selected():
+      auto_login_checkbox.click()
+  ```
+
+### 쿠키 관리
+- **저장 경로**: `cookies/{site}_cookies.pkl`
+- **쿠키 저장**:
+  ```python
+  cookies = driver.get_cookies()
+  with open('cookies/musinsa_cookies.pkl', 'wb') as f:
+      pickle.dump(cookies, f)
+  ```
+- **쿠키 로드**:
+  ```python
+  if os.path.exists('cookies/musinsa_cookies.pkl'):
+      with open('cookies/musinsa_cookies.pkl', 'rb') as f:
+          cookies = pickle.load(f)
+      for cookie in cookies:
+          driver.add_cookie(cookie)
+  ```
+
+### LoginManager 통합
+- **필수**: `login_manager.py`의 LoginManager 클래스 활용
+- **사용 예시**:
+  ```python
+  from login_manager import LoginManager
+  
+  login_mgr = LoginManager("musinsa")
+  if login_mgr.ensure_login():
+      # 로그인 성공, 작업 진행
+      driver = login_mgr.driver
+  else:
+      # 로그인 실패 처리
+      raise Exception("로그인 실패")
+  ```
+
+### 멀티프로세싱 로그인 상태 공유
+- **필수**: 메인 프로세스에서 로그인 후 쿠키 공유
+- **구현 예시**:
+  ```python
+  # 메인 프로세스
+  login_mgr = LoginManager("musinsa")
+  login_mgr.ensure_login()
+  cookies = login_mgr.driver.get_cookies()
+  
+  # 워커 프로세스
+  def worker_process(cookies):
+      driver = setup_driver()
+      driver.get("https://www.musinsa.com")
+      for cookie in cookies:
+          driver.add_cookie(cookie)
+      driver.refresh()
+  ```
+
+### 보안 규칙
+- **금지**: 로그에 비밀번호 출력
+- **필수**: 비밀번호 마스킹
+  ```python
+  logger.info(f"로그인 시도: {username}")  # 비밀번호는 로그하지 않음
+  ```
+- **금지**: Git에 로그인 정보 커밋
+- **필수**: `.gitignore`에 추가
+  ```
+  .env
+  cookies/
+  *_cookies.pkl
+  config/credentials.json
+  ```
+
 ### unified_items 형식
 - **필수 필드**: code (product_code가 아님!), brand, size, price
 - **선택 필드**: color, adjusted_price, link
@@ -114,13 +288,38 @@
 ## 멀티프로세싱 규칙
 
 ### Chrome 드라이버
+- **undetected_chromedriver 사용 필수**:
+  ```python
+  import undetected_chromedriver as uc
+  
+  options = uc.ChromeOptions()
+  options.add_argument('--no-sandbox')
+  options.add_argument('--disable-dev-shm-usage')
+  
+  # 워커별 헤드리스 설정
+  if worker_id > 1:  # 첫 번째 워커만 GUI 표시
+      options.add_argument('--headless')
+  
+  driver = uc.Chrome(options=options, version_main=None)
+  ```
 - **포트 충돌 방지**: `port = 9222 + worker_id`
 - **워커별 임시 디렉토리**: `f'chrome_worker_{worker_id}_{os.getpid()}'`
+- **워커별 chromedriver 복사본 생성**:
+  ```python
+  # undetected_chromedriver 경로에서 복사
+  driver_dir = os.path.join(tempfile.gettempdir(), f'chromedriver_worker_{worker_id}_{os.getpid()}')
+  os.makedirs(driver_dir, exist_ok=True)
+  driver_path = os.path.join(driver_dir, 'chromedriver.exe')
+  shutil.copy2(existing_driver, driver_path)
+  ```
 - **종료 시 정리 필수**:
   ```python
   finally:
       if driver:
           driver.quit()
+      # 임시 디렉토리 정리
+      if os.path.exists(user_data_dir):
+          shutil.rmtree(user_data_dir, ignore_errors=True)
       os.system(f"taskkill /F /PID {os.getpid()} >nul 2>&1")
   ```
 
@@ -186,6 +385,46 @@
 - **대기 시간**: 새 상품 로드 시 충분한 대기 (2-3초)
 - **중복 제거**: Set 자료구조 사용하여 중복 링크 제거
 
+### Selenium WebDriverWait 사용 규칙
+- **명시적 대기 우선 사용**:
+  ```python
+  from selenium.webdriver.support.ui import WebDriverWait
+  from selenium.webdriver.support import expected_conditions as EC
+  
+  # 요소가 나타날 때까지 대기
+  element = WebDriverWait(driver, 10).until(
+      EC.presence_of_element_located((By.CSS_SELECTOR, "selector"))
+  )
+  
+  # 클릭 가능할 때까지 대기
+  button = WebDriverWait(driver, 10).until(
+      EC.element_to_be_clickable((By.XPATH, "//button[@id='submit']"))
+  )
+  ```
+
+- **JavaScript executor 활용**:
+  ```python
+  # 요소가 가려져 있을 때
+  driver.execute_script("arguments[0].click();", element)
+  
+  # 스크롤
+  driver.execute_script("arguments[0].scrollIntoView(true);", element)
+  
+  # 값 직접 설정
+  driver.execute_script("arguments[0].value = arguments[1];", input_element, value)
+  ```
+
+- **StaleElementReferenceException 처리**:
+  ```python
+  for retry in range(3):
+      try:
+          element.click()
+          break
+      except StaleElementReferenceException:
+          element = driver.find_element(By.ID, "element_id")
+          time.sleep(0.5)
+  ```
+
 ## 파일 간 의존성
 
 ### 수정 시 함께 확인해야 할 파일
@@ -194,6 +433,10 @@
 - `poison_integrated_bidding.py` 수정 시 → `poison_bidder_wrapper_v2.py` 파라미터 확인
 - `unified_bidding.py` 수정 시 → 전체 데이터 흐름 테스트 필수
 - `abcmart_link_extractor.py` 수정 시 → `poison_bidder_wrapper_v2.py` 링크 추출 로직 동기화
+- `poison_bidder_wrapper_v2.py` 수정 시 → 다음 사항 확인:
+  - 포이즌 로그인 정보 변경 시 환경변수 업데이트
+  - 무신사 로그인 기능 추가 시 `LoginManager` 클래스 사용
+  - 멀티프로세싱 워커 수정 시 쿠키 공유 로직 확인
 
 ## 테스트 및 디버깅 규칙
 
@@ -222,6 +465,65 @@
 - [ ] 필수 필드(code, brand, size, price)가 있는지 확인
 - [ ] None 값 처리
 - [ ] 빈 문자열 처리
+
+## 데이터베이스 규칙
+
+### MySQL 접속 정보
+- **필수**: 환경변수로 관리
+  ```python
+  DB_HOST = os.getenv('DB_HOST', 'localhost')
+  DB_USER = os.getenv('DB_USER', 'root')
+  DB_PASSWORD = os.getenv('DB_PASSWORD', '')
+  DB_NAME = os.getenv('DB_NAME', '')
+  ```
+
+### MySQL 명령 실행
+- **필수 형식**:
+  ```bash
+  mysql -u root -p -e "SQL명령어" 데이터베이스명
+  ```
+- **중요**: SQL 명령어는 반드시 따옴표로 감싸야 함
+  ```python
+  command = ['mysql', '-u', 'root', '-e', '"SHOW DATABASES;"']
+  ```
+
+### 데이터베이스 경로
+- **SQLite**: `db/bidding_history.db`
+- **로그 DB**: `db/logs.db`
+
+## 환경변수 관리
+
+### .env 파일 구조
+```env
+# 텔레그램 봇
+TELEGRAM_BOT_TOKEN=your_token
+
+# 무신사 로그인
+MUSINSA_ID=your_id
+MUSINSA_PASSWORD=your_password
+
+# 포이즌 로그인
+POISON_PHONE=your_phone
+POISON_PASSWORD=your_password
+
+# 데이터베이스
+DB_HOST=localhost
+DB_USER=root
+DB_PASSWORD=your_password
+DB_NAME=your_database
+
+# 로그 설정
+LOG_LEVEL=INFO
+```
+
+### 환경변수 사용
+- **필수**: python-dotenv 사용
+  ```python
+  from dotenv import load_dotenv
+  load_dotenv()
+  
+  value = os.getenv('KEY', 'default_value')
+  ```
 
 ## 텔레그램 봇 상태 추적 규칙 ⚠️ CRITICAL
 
@@ -356,6 +658,75 @@
       )
   ```
 
+## Shrimp Task Manager 사용 규칙 ⚠️ CRITICAL
+
+### 작업 계획 및 실행 모드
+- **TaskPlanner 모드**: 새 기능 개발이나 버그 수정 시 작업 계획 수립
+  ```python
+  # plan_task 사용 예시
+  { "tool": "shrimp-task:plan_task", 
+    "parameters": { 
+      "description": "무신사 팝업 처리 기능 개선",
+      "requirements": "다양한 팝업 유형 대응, JavaScript 활용"
+    }
+  }
+  ```
+
+- **TaskExecutor 모드**: 계획된 작업 실행
+  ```python
+  # execute_task 사용 예시
+  { "tool": "shrimp-task:execute_task", 
+    "parameters": { 
+      "taskId": "TASK-2025-0001" 
+    }
+  }
+  ```
+
+### 작업 관리 워크플로우
+1. **프로젝트 초기화** (선택사항):
+   ```python
+   { "tool": "shrimp-task:init_project_rules" }
+   ```
+
+2. **작업 계획 수립**:
+   - 작업 분석: `analyze_task`
+   - 사고 프로세스: `process_thought`  
+   - 계획 반영: `reflect_task`
+   - 작업 분할: `split_tasks` (clearAllTasks 모드 사용)
+
+3. **작업 실행**:
+   - 작업 목록 확인: `list_tasks`
+   - 작업 실행: `execute_task`
+   - 작업 검증: `verify_task` (80점 이상 시 자동 완료)
+
+### split_tasks 모드 선택
+- **clearAllTasks** (기본값): 새로운 계획 수립 시
+- **append**: 기존 작업에 추가
+- **overwrite**: 미완료 작업만 교체
+- **selective**: 특정 작업만 업데이트
+
+### 작업 단위 규칙
+- **크기**: 1-2일 내 완료 가능한 단위로 분할
+- **개수**: 최대 10개 이하로 제한
+- **의존성**: 작업 간 dependencies 명시
+- **검증 기준**: 각 작업에 verificationCriteria 포함
+
+### 연속 실행 모드
+- **사용 시기**: 여러 작업을 자동으로 처리할 때
+- **활성화**: 사용자에게 "continuous mode" 사용 여부 확인
+- **진행**: execute_task → verify_task → 다음 작업 자동 진행
+
+### 파일 작업 시 Shrimp 통합
+1. **작업 전**: 관련 작업이 있는지 `query_task`로 확인
+2. **파일 수정**: `text-editor` 또는 `filesystem` 도구 사용
+3. **작업 업데이트**: `update_task`로 진행 상황 기록
+4. **완료 후**: `verify_task`로 검증
+
+### Shrimp 데이터 관리
+- **작업 파일 위치**: `shrimp_data/tasks.json`
+- **삭제 금지**: 작업은 함부로 삭제하지 않고 동의 필요
+- **초기화 금지**: clearAllTasks는 사용자 동의 필수
+
 ## 금지 사항
 
 ### 절대 하지 말아야 할 것들
@@ -366,3 +737,65 @@
 - **금지**: 테스트 없이 프로덕션 배포
 - **금지**: status_callback 없이 시간 기반 진행률 표시
 - **금지**: 콜백 호출 시 상태 코드 하드코딩 (정의된 상수 사용)
+- **금지**: 로그인 정보 하드코딩 또는 Git 커밋
+- **금지**: 쿠키 파일을 Git에 커밋
+- **금지**: Shrimp 작업을 사용자 동의 없이 삭제
+- **금지**: clearAllTasks를 사용자 동의 없이 실행
+- **금지**: analyze_task 도구를 프로젝트 규칙 작성 시 호출
+- **금지**: 작업 진행 전 동의 없이 자동 실행
+
+## AI Agent 작업 지침
+
+### 작업 시작 전 확인 사항
+1. **현재 작업 확인**: `shrimp-task:list_tasks`로 진행 중인 작업 확인
+2. **관련 파일 확인**: 수정할 파일과 연관된 파일들 미리 확인
+3. **테스트 파일 확인**: `test/` 디렉토리에 관련 테스트 존재 여부
+
+### 작업 진행 순서
+1. **계획 수립**: TaskPlanner 모드로 작업 계획
+2. **사용자 동의**: 작업 진행 전 반드시 동의 받기
+3. **작업 실행**: TaskExecutor 모드로 순차 실행
+4. **검증**: 각 작업 완료 후 verify_task로 검증
+
+### 파일 수정 시 주의사항
+- **섹션별 수정**: 큰 파일은 3-5개 섹션으로 나누어 수정
+- **라인 번호 재확인**: 각 edit 전에 반드시 소스 위치 재확인
+- **dry-run 우선**: edit_file_lines 사용 시 항상 dryRun: true로 먼저 테스트
+
+### 작업 완료 후
+- **Git 커밋**: 파일 수정 후 즉시 add와 commit
+- **테스트 실행**: 관련 테스트 파일 실행하여 검증
+- **문서 업데이트**: 필요시 README.md나 가이드 문서 업데이트
+
+## Git 작업 규칙
+
+### 브랜치 전략
+- **master**: 안정된 프로덕션 코드
+- **test**: 테스트 및 검증용 브랜치
+- **feature/***: 새 기능 개발용 브랜치
+
+### 커밋 규칙
+- **커밋 메시지 형식**:
+  ```
+  type: 간단한 설명
+  
+  - 상세 변경사항 1
+  - 상세 변경사항 2
+  ```
+- **타입 종류**:
+  - `feat`: 새로운 기능
+  - `fix`: 버그 수정
+  - `docs`: 문서 수정
+  - `style`: 코드 포맷팅
+  - `refactor`: 리팩토링
+  - `test`: 테스트 코드
+  - `chore`: 빌드, 패키지 매니저 등
+
+### 파일 작업 후 Git 처리
+- **필수**: 파일 생성/수정 후 즉시 git add와 commit
+  ```bash
+  git add <파일명>
+  git commit -m "type: 설명"
+  ```
+- **필수**: 작업 완료 후 pull request
+- **필수**: test 브랜치에서 충분히 검증 후 master 병합
