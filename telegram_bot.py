@@ -11,6 +11,7 @@ import logging
 import asyncio
 import queue
 import threading
+import re
 from pathlib import Path
 from datetime import datetime
 from typing import Dict, Any, Optional
@@ -45,7 +46,101 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # ConversationHandler 상태 정의
-WAITING_DISCOUNT, WAITING_PROFIT = range(2)
+# 순서: 적립금선할인 → 카드할인 → 기본할인율 → 최소수익
+(WAITING_POINTS_USE, WAITING_POINTS_RATE, 
+ WAITING_CARD_USE, WAITING_CARD_INPUT,
+ WAITING_DISCOUNT, WAITING_PROFIT) = range(6)
+
+
+def parse_card_discount(input_text: str) -> Optional[Dict[str, Any]]:
+    """카드 할인 문자열을 파싱하여 구조화된 데이터로 변환
+    
+    Args:
+        input_text: 사용자가 입력한 카드 할인 조건 문자열
+        
+    Returns:
+        파싱된 할인 정보 딕셔너리 또는 None
+        - type: 'threshold' (임계값 기반) 또는 'proportional' (비례 할인)
+        - base_amount: 기준 금액 (원 단위)
+        - discount_amount: 할인 금액 (원 단위)
+        - condition: 'gte' (이상) 또는 'gt' (초과)
+    
+    Examples:
+        "3만원 이상 3천원" -> {type: 'threshold', base_amount: 30000, discount_amount: 3000, condition: 'gte'}
+        "5만원 초과 5천원" -> {type: 'threshold', base_amount: 50000, discount_amount: 5000, condition: 'gt'}
+        "10만원당 1만원" -> {type: 'proportional', base_amount: 100000, discount_amount: 10000}
+    """
+    if not input_text:
+        return None
+        
+    # 입력 텍스트 정규화 (공백 제거, 소문자 변환)
+    text = input_text.strip().replace(' ', '')
+    
+    # 금액 단위 변환 함수
+    def parse_amount(amount_str: str, unit: str) -> int:
+        """금액 문자열과 단위를 받아 원 단위로 변환"""
+        try:
+            amount = float(amount_str)
+            if unit == '천' or unit == '천원':
+                return int(amount * 1000)
+            elif unit == '만' or unit == '만원':
+                return int(amount * 10000)
+            elif unit == '원':
+                return int(amount)
+            else:
+                return 0
+        except ValueError:
+            return 0
+    
+    # 패턴 1: 임계값 기반 할인 (예: "3만원 이상 3천원", "5만원 초과 5천원")
+    threshold_pattern = r'(\d+\.?\d*)(천|만|천원|만원|원)\s*(이상|초과)\s*(\d+\.?\d*)(천|만|천원|만원|원)'
+    threshold_match = re.search(threshold_pattern, text)
+    
+    if threshold_match:
+        base_amount = parse_amount(threshold_match.group(1), threshold_match.group(2))
+        condition = 'gte' if threshold_match.group(3) == '이상' else 'gt'
+        discount_amount = parse_amount(threshold_match.group(4), threshold_match.group(5))
+        
+        return {
+            'type': 'threshold',
+            'base_amount': base_amount,
+            'discount_amount': discount_amount,
+            'condition': condition
+        }
+    
+    # 패턴 2: 비례 할인 (예: "10만원당 1만원", "5만원마다 5천원")
+    proportional_pattern = r'(\d+\.?\d*)(천|만|천원|만원|원)\s*(당|마다)\s*(\d+\.?\d*)(천|만|천원|만원|원)'
+    proportional_match = re.search(proportional_pattern, text)
+    
+    if proportional_match:
+        base_amount = parse_amount(proportional_match.group(1), proportional_match.group(2))
+        discount_amount = parse_amount(proportional_match.group(4), proportional_match.group(5))
+        
+        return {
+            'type': 'proportional',
+            'base_amount': base_amount,
+            'discount_amount': discount_amount
+        }
+    
+    # 패턴 3: 간단한 형식 (예: "3만3천", "5만5천" - 기본적으로 "이상" 조건으로 처리)
+    simple_pattern = r'(\d+)만\s*(\d+)?천'
+    simple_match = re.search(simple_pattern, text)
+    
+    if simple_match:
+        base_amount = int(simple_match.group(1)) * 10000
+        discount_amount = int(simple_match.group(2) or 0) * 1000
+        
+        # 기본 금액과 할인 금액이 비슷하면 "만원당" 형식으로 간주
+        if base_amount > 0 and discount_amount > 0:
+            return {
+                'type': 'threshold',
+                'base_amount': base_amount,
+                'discount_amount': discount_amount,
+                'condition': 'gte'
+            }
+    
+    # 파싱 실패
+    return None
 
 
 class BiddingBot:
@@ -140,16 +235,29 @@ class BiddingBot:
         context.user_data['site'] = site
         context.user_data['keywords'] = keywords
         
-        # 할인율 입력 요청
+        # 적립금 선할인 사용 여부 질문
+        keyboard = [
+            [
+                InlineKeyboardButton("✅ 사용", callback_data="points_use_yes"),
+                InlineKeyboardButton("❌ 미사용", callback_data="points_use_no")
+            ]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
         await update.message.reply_text(
-            "💰 **할인율 설정**\n\n"
-            "희망 할인율을 입력하세요 (1-30%)\n"
-            "예: 5, 10, 15, 20\n\n"
-            "숫자만 입력하면 됩니다.",
+            "💳 **무신사 적립금 선할인**\n\n"
+            "무신사 적립금 선할인을 사용하시겠습니까?\n\n"
+            "📄 멤버십 등급별 적립률:\n"
+            "• 브론즈: 2%\n"
+            "• 실버: 3%\n"
+            "• 골드: 4%\n"
+            "• 플래티넘: 5%\n"
+            "• 다이아: 6-8%",
+            reply_markup=reply_markup,
             parse_mode='Markdown'
         )
         
-        return WAITING_DISCOUNT
+        return WAITING_POINTS_USE
     
     async def help_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """도움말 명령어"""
