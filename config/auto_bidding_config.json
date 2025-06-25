@@ -6,7 +6,7 @@
   "extraction": {
     "max_scrolls": 30,
     "wait_time": 3,
-    "max_links": 100,
+    "max_links": 500,
     "timeout": 30,
     "max_pages": 100,
     "page_wait_time": 3,
