@@ -475,8 +475,45 @@ class BiddingBot:
             keywords = context.user_data.get('keywords', [])
             discount_rate = context.user_data.get('discount_rate', 5)
             
-            # callback_data에 설정값 포함
-            callback_data = f"auto_start_custom_{site}_{'|'.join(keywords)}_{discount_rate}_{min_profit}"
+            # 설정 정보 구성
+            settings_msg = f"🤖 **자동화 입찰 설정 확인**\n\n"
+            settings_msg += f"🏪 사이트: {site.upper()}\n"
+            settings_msg += f"🔍 키워드: {', '.join(keywords)}\n\n"
+            
+            # 적립금 선할인 정보
+            if context.user_data.get('use_points_discount', False):
+                points_rate = context.user_data.get('points_rate', 0)
+                settings_msg += f"💳 무신사 적립금 선할인: {points_rate}%\n"
+            else:
+                settings_msg += f"💳 무신사 적립금 선할인: 미사용\n"
+            
+            # 카드 할인 정보
+            if context.user_data.get('use_card_discount', False):
+                card_discount = context.user_data.get('card_discount')
+                if card_discount:
+                    if card_discount['type'] == 'threshold':
+                        condition = "이상" if card_discount['condition'] == 'gte' else "초과"
+                        settings_msg += f"💳 카드 할인: {card_discount['base_amount']:,}원 {condition} {card_discount['discount_amount']:,}원 할인\n"
+                    else:
+                        settings_msg += f"💳 카드 할인: {card_discount['base_amount']:,}원당 {card_discount['discount_amount']:,}원 할인\n"
+            else:
+                settings_msg += f"💳 카드 할인: 미사용\n"
+            
+            settings_msg += f"\n💰 기본 할인율: {discount_rate}%\n"
+            settings_msg += f"💵 최소 수익: {min_profit:,}원\n\n"
+            settings_msg += f"이대로 진행하시겠습니까?"
+            
+            # callback_data에 설정값 포함 (적립금과 카드 할인 정보 추가)
+            callback_data_parts = [
+                "auto_start_with_discounts",
+                site,
+                '|'.join(keywords),
+                str(discount_rate),
+                str(min_profit),
+                str(context.user_data.get('points_rate', 0)),
+                '1' if context.user_data.get('use_card_discount', False) else '0'
+            ]
+            callback_data = "_".join(callback_data_parts)
             
             keyboard = [
                 [
@@ -487,12 +524,7 @@ class BiddingBot:
             reply_markup = InlineKeyboardMarkup(keyboard)
             
             await update.message.reply_text(
-                f"🤖 **자동화 입찰 설정 확인**\n\n"
-                f"🏪 사이트: {site.upper()}\n"
-                f"🔍 키워드: {', '.join(keywords)}\n"
-                f"💰 할인율: {discount_rate}%\n"
-                f"💵 최소 수익: {min_profit:,}원\n\n"
-                f"이대로 진행하시겠습니까?",
+                settings_msg,
                 reply_markup=reply_markup,
                 parse_mode='Markdown'
             )
@@ -517,6 +549,56 @@ class BiddingBot:
         context.user_data.clear()
         return ConversationHandler.END
     
+    async def card_input_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """카드 할인 조건 입력 처리"""
+        try:
+            # 입력값 파싱
+            text = update.message.text.strip()
+            card_discount = parse_card_discount(text)
+            
+            if not card_discount:
+                await update.message.reply_text(
+                    "⚠️ 올바른 형식으로 입력해주세요.\n\n"
+                    "예시:\n"
+                    "• `3만원 이상 3천원`\n"
+                    "• `5만원당 5천원`\n"
+                    "• `10만원 초과 1만원`",
+                    parse_mode='Markdown'
+                )
+                return WAITING_CARD_INPUT
+            
+            # 저장
+            context.user_data['card_discount'] = card_discount
+            
+            # 카드 할인 정보 표시
+            discount_info = f"카드 할인: "
+            if card_discount['type'] == 'threshold':
+                condition_text = "이상" if card_discount['condition'] == 'gte' else "초과"
+                discount_info += f"{card_discount['base_amount']:,}원 {condition_text} {card_discount['discount_amount']:,}원 할인"
+            else:  # proportional
+                discount_info += f"{card_discount['base_amount']:,}원당 {card_discount['discount_amount']:,}원 할인"
+            
+            # 기본 할인율 입력 요청
+            await update.message.reply_text(
+                f"✅ {discount_info}\n\n"
+                "💰 **기본 할인율 설정**\n\n"
+                "기본 할인율을 입력하세요 (1-30%)\n"
+                "예: 5, 10, 15, 20\n\n"
+                "숫자만 입력하면 됩니다.",
+                parse_mode='Markdown'
+            )
+            
+            return WAITING_DISCOUNT
+            
+        except Exception as e:
+            logger.error(f"카드 할인 입력 처리 중 오류: {e}")
+            await update.message.reply_text(
+                "⚠️ 처리 중 오류가 발생했습니다.\n"
+                "다시 입력해주세요.",
+                parse_mode='Markdown'
+            )
+            return WAITING_CARD_INPUT
+    
     async def button_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """버튼 콜백 처리"""
         query = update.callback_query
@@ -524,7 +606,93 @@ class BiddingBot:
         
         data = query.data
         
-        if data.startswith("bid_start_"):
+        # 적립금 선할인 사용 여부 처리
+        if data == "points_use_yes":
+            # 적립금 선할인 사용 선택
+            context.user_data['use_points_discount'] = True
+            
+            # 퍼센트 선택 버튼 표시
+            keyboard = []
+            # 2x4 그리드로 1-8% 버튼 배치
+            for i in range(0, 8, 2):
+                row = []
+                for j in range(2):
+                    percent = i + j + 1
+                    row.append(InlineKeyboardButton(f"{percent}%", callback_data=f"points_rate_{percent}"))
+                keyboard.append(row)
+            
+            # 취소 버튼 추가
+            keyboard.append([InlineKeyboardButton("❌ 취소", callback_data="auto_cancel")])
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            await query.edit_message_text(
+                "💳 **적립금 선할인 비율 선택**\n\n"
+                "귀하의 멤버십 등급에 맞는 적립률을 선택하세요:\n\n"
+                "📊 **멤버십별 적립률**\n"
+                "• 브론즈: 2%\n"
+                "• 실버: 3%\n"
+                "• 골드: 4%\n"
+                "• 플래티넘: 5%\n"
+                "• 다이아: 6-8%",
+                reply_markup=reply_markup,
+                parse_mode='Markdown'
+            )
+            return  # ConversationHandler에서 상태 관리
+            
+        elif data == "points_use_no":
+            # 적립금 선할인 미사용
+            context.user_data['use_points_discount'] = False
+            context.user_data['points_rate'] = 0
+            
+            # 카드 할인 사용 여부 질문으로 이동
+            keyboard = [
+                [
+                    InlineKeyboardButton("✅ 사용", callback_data="card_use_yes"),
+                    InlineKeyboardButton("❌ 미사용", callback_data="card_use_no")
+                ]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            await query.edit_message_text(
+                "💳 **카드 할인 사용**\n\n"
+                "카드 할인을 사용하시겠습니까?\n\n"
+                "예시:\n"
+                "• 3만원 이상 3천원 할인\n"
+                "• 5만원당 5천원 할인\n"
+                "• 10만원 이상 1만원 할인",
+                reply_markup=reply_markup,
+                parse_mode='Markdown'
+            )
+            return
+            
+        elif data.startswith("points_rate_"):
+            # 적립금 퍼센트 선택
+            rate = int(data.replace("points_rate_", ""))
+            context.user_data['points_rate'] = rate
+            
+            # 카드 할인 사용 여부 질문으로 이동
+            keyboard = [
+                [
+                    InlineKeyboardButton("✅ 사용", callback_data="card_use_yes"),
+                    InlineKeyboardButton("❌ 미사용", callback_data="card_use_no")
+                ]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            await query.edit_message_text(
+                f"✅ 적립금 선할인 {rate}% 선택됨\n\n"
+                "💳 **카드 할인 사용**\n\n"
+                "카드 할인을 사용하시겠습니까?\n\n"
+                "예시:\n"
+                "• 3만원 이상 3천원 할인\n"
+                "• 5만원당 5천원 할인\n"
+                "• 10만원 이상 1만원 할인",
+                reply_markup=reply_markup,
+                parse_mode='Markdown'
+            )
+            return
+        
+        elif data.startswith("bid_start_"):
             # 입찰 시작
             _, _, site, strategy = data.split("_")
             await query.edit_message_text("🚀 입찰을 시작합니다...")
@@ -536,8 +704,43 @@ class BiddingBot:
             # 자동화 입찰 시작
             custom_discount_rate = None
             custom_min_profit = None
+            points_rate = None
+            card_discount = None
             
-            if data.startswith("auto_start_custom_"):
+            if data.startswith("auto_start_with_discounts_"):
+                # 새로운 형식: auto_start_with_discounts_{site}_{keywords}_{discount}_{profit}_{points_rate}_{use_card}
+                parts = data.replace("auto_start_with_discounts_", "").split("_")
+                
+                if len(parts) >= 6:
+                    site = parts[0]
+                    
+                    try:
+                        # 설정값 파싱
+                        use_card = parts[-1] == '1'
+                        points_rate_value = float(parts[-2])
+                        custom_min_profit = int(parts[-3])
+                        custom_discount_rate = float(parts[-4])
+                        
+                        # 키워드 파싱
+                        keywords_part = "_".join(parts[1:-4])
+                        keywords = keywords_part.split("|") if keywords_part else []
+                        
+                        # 적립금 선할인 설정
+                        if points_rate_value > 0:
+                            points_rate = points_rate_value
+                        
+                        # 카드 할인 정보 가져오기
+                        if use_card and context.user_data.get('card_discount'):
+                            card_discount = context.user_data['card_discount']
+                            
+                    except (ValueError, IndexError):
+                        # 파싱 실패 시 기본값 사용
+                        keywords = parts[1].split("|") if len(parts) > 1 else []
+                else:
+                    site = parts[0] if parts else 'musinsa'
+                    keywords = parts[1].split("|") if len(parts) > 1 else []
+                    
+            elif data.startswith("auto_start_custom_"):
                 # 커스텀 설정이 있는 경우
                 # 형식: auto_start_custom_{site}_{keywords}_{discount}_{profit}
                 parts = data.replace("auto_start_custom_", "").split("_")
@@ -566,10 +769,49 @@ class BiddingBot:
             await query.edit_message_text("🤖 자동화 입찰을 시작합니다...")
             
             # 비동기로 자동 입찰 실행 (커스텀 설정 포함)
-            asyncio.create_task(self._run_auto_bidding(query, site, keywords, custom_discount_rate, custom_min_profit))
+            asyncio.create_task(self._run_auto_bidding(
+                query, site, keywords, 
+                custom_discount_rate, custom_min_profit,
+                points_rate, card_discount
+            ))
             
         elif data == "bid_cancel" or data == "auto_cancel":
             await query.edit_message_text("❌ 취소되었습니다.")
+            # user_data 초기화
+            context.user_data.clear()
+            
+        elif data == "card_use_yes":
+            # 카드 할인 사용 선택
+            context.user_data['use_card_discount'] = True
+            
+            await query.edit_message_text(
+                "💳 **카드 할인 조건 입력**\n\n"
+                "카드 할인 조건을 입력해주세요.\n\n"
+                "📝 **입력 예시:**\n"
+                "• `3만원 이상 3천원`\n"
+                "• `5만원 초과 5천원`\n"
+                "• `10만원당 1만원`\n"
+                "• `5만원마다 5천원`\n"
+                "• `3만3천` (3만원 이상 3천원으로 해석)\n\n"
+                "숫자와 단위를 정확히 입력해주세요.",
+                parse_mode='Markdown'
+            )
+            return WAITING_CARD_INPUT
+            
+        elif data == "card_use_no":
+            # 카드 할인 미사용
+            context.user_data['use_card_discount'] = False
+            context.user_data['card_discount'] = None
+            
+            # 기본 할인율 입력으로 이동
+            await query.edit_message_text(
+                "💰 **기본 할인율 설정**\n\n"
+                "기본 할인율을 입력하세요 (1-30%)\n"
+                "예: 5, 10, 15, 20\n\n"
+                "숫자만 입력하면 됩니다.",
+                parse_mode='Markdown'
+            )
+            return WAITING_DISCOUNT
             
         elif data == "stop_confirm":
             self.is_running = False
@@ -580,7 +822,9 @@ class BiddingBot:
     
     async def _run_auto_bidding(self, query, site: str, keywords: list,
                                 custom_discount_rate: float = None,
-                                custom_min_profit: int = None):
+                                custom_min_profit: int = None,
+                                points_rate: float = None,
+                                card_discount: dict = None):
         """자동화 입찰 실행 (비동기)"""
         chat_id = query.message.chat_id
         
@@ -607,6 +851,14 @@ class BiddingBot:
                 start_message += f"💰 할인율: {custom_discount_rate}%\n"
             if custom_min_profit is not None:
                 start_message += f"💵 최소 수익: {custom_min_profit:,}원\n"
+            if points_rate is not None and points_rate > 0:
+                start_message += f"💳 적립금 선할인: {points_rate}%\n"
+            if card_discount is not None:
+                if card_discount['type'] == 'threshold':
+                    condition = "이상" if card_discount['condition'] == 'gte' else "초과"
+                    start_message += f"💳 카드 할인: {card_discount['base_amount']:,}원 {condition} {card_discount['discount_amount']:,}원\n"
+                else:
+                    start_message += f"💳 카드 할인: {card_discount['base_amount']:,}원당 {card_discount['discount_amount']:,}원\n"
             
             start_message += (
                 f"\n⏰ 예상 시간: 10-15분\n\n"
@@ -684,7 +936,9 @@ class BiddingBot:
                     strategy='basic',
                     status_callback=status_callback,
                     custom_discount_rate=custom_discount_rate,
-                    custom_min_profit=custom_min_profit
+                    custom_min_profit=custom_min_profit,
+                    points_rate=points_rate,
+                    card_discount=card_discount
                 )
                 
                 # 작업 완료 후 잠시 대기 (마지막 메시지 처리)
@@ -700,10 +954,24 @@ class BiddingBot:
                     )
                     
                     # 커스텀 설정이 있으면 표시
-                    if custom_discount_rate is not None:
-                        success_msg += f"├ 💰 적용 할인율: {custom_discount_rate}%\n"
+                    if points_rate is not None and points_rate > 0:
+                        success_msg += f"├ 💳 적립금 선할인: {points_rate}%\n"
                     else:
-                        success_msg += f"├ 💰 적용 할인율: 기본 전략\n"
+                        success_msg += f"├ 💳 적립금 선할인: 미사용\n"
+                        
+                    if card_discount is not None:
+                        if card_discount['type'] == 'threshold':
+                            condition = "이상" if card_discount['condition'] == 'gte' else "초과"
+                            success_msg += f"├ 💳 카드 할인: {card_discount['base_amount']:,}원 {condition} {card_discount['discount_amount']:,}원\n"
+                        else:
+                            success_msg += f"├ 💳 카드 할인: {card_discount['base_amount']:,}원당 {card_discount['discount_amount']:,}원\n"
+                    else:
+                        success_msg += f"├ 💳 카드 할인: 미사용\n"
+                        
+                    if custom_discount_rate is not None:
+                        success_msg += f"├ 💰 기본 할인율: {custom_discount_rate}%\n"
+                    else:
+                        success_msg += f"├ 💰 기본 할인율: 기본 전략\n"
                         
                     if custom_min_profit is not None:
                         success_msg += f"└ 💵 최소 수익 기준: {custom_min_profit:,}원\n\n"
@@ -877,10 +1145,18 @@ class BiddingBot:
         conv_handler = ConversationHandler(
             entry_points=[CommandHandler("auto", self.auto_command)],
             states={
+                WAITING_POINTS_USE: [CallbackQueryHandler(self.button_callback)],
+                WAITING_POINTS_RATE: [CallbackQueryHandler(self.button_callback)],
+                WAITING_CARD_USE: [CallbackQueryHandler(self.button_callback)],
+                WAITING_CARD_INPUT: [MessageHandler(filters.TEXT & ~filters.COMMAND, self.card_input_handler)],
                 WAITING_DISCOUNT: [MessageHandler(filters.TEXT & ~filters.COMMAND, self.discount_handler)],
                 WAITING_PROFIT: [MessageHandler(filters.TEXT & ~filters.COMMAND, self.profit_handler)]
             },
-            fallbacks=[CommandHandler("cancel", self.cancel_handler)]
+            fallbacks=[
+                CommandHandler("cancel", self.cancel_handler),
+                CallbackQueryHandler(self.button_callback, pattern="^auto_cancel$")
+            ],
+            per_message=False
         )
         
         # 핸들러 등록
