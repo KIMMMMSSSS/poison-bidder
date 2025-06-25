@@ -83,7 +83,8 @@ class UnifiedBidding:
     
     def run_pipeline(self, site: str = "musinsa", strategy_id: str = "basic", 
                     exec_mode: str = "auto", process_mode: str = "sequential",
-                    web_scraping: bool = False, search_keyword: str = None) -> Dict[str, Any]:
+                    web_scraping: bool = False, search_keyword: str = None,
+                    points_rate: Optional[float] = None, card_discount: Optional[dict] = None) -> Dict[str, Any]:
         """
         전체 파이프라인 실행
         
@@ -94,6 +95,8 @@ class UnifiedBidding:
             process_mode: 처리 방식 ("sequential" 또는 "parallel")
             web_scraping: 웹 스크래핑 사용 여부 (기본값: False)
             search_keyword: 검색 키워드 (web_scraping이 True일 때 사용)
+            points_rate: 적립금 선할인 비율 (0-8 범위)
+            card_discount: 카드 할인 정보 딕셔너리
             
         Returns:
             실행 결과 딕셔너리
@@ -133,7 +136,7 @@ class UnifiedBidding:
             # 3. 가격 조정
             step_start = datetime.now()
             logger.info("[3/4] 가격 조정 시작...")
-            adjusted_items = self._adjust_prices(items, strategy_id)
+            adjusted_items = self._adjust_prices(items, strategy_id, points_rate, card_discount)
             self.results['adjusted_items'] = adjusted_items
             step_times['price_adjustment'] = (datetime.now() - step_start).total_seconds()
             logger.info(f"가격 조정 완료: {len(adjusted_items)}개 (소요시간: {step_times['price_adjustment']:.2f}초)")
@@ -406,8 +409,13 @@ class UnifiedBidding:
             logger.error(f"스크래핑 결과 파일 읽기 실패: {e}")
             return []
     
-    def _adjust_prices(self, items: List[Dict[str, Any]], strategy_id: str) -> List[Dict[str, Any]]:
-        """가격 조정 적용"""
+    def _adjust_prices(self, items: List[Dict[str, Any]], strategy_id: str,
+                      points_rate: Optional[float] = None,
+                      card_discount: Optional[dict] = None) -> List[Dict[str, Any]]:
+        """
+        가격 조정 적용
+        할인 순서: 적립금 선할인 → 카드 할인 → 기본 할인율
+        """
         strategy = self.config['strategies'].get(strategy_id)
         
         if not strategy or not strategy.get('enabled', False):
@@ -422,21 +430,57 @@ class UnifiedBidding:
             adjusted_item = item.copy()
             price = item['price']
             original_price = price
+            price_after_discounts = original_price
             
-            # 각 할인 적용
+            # 1. 적립금 선할인 적용
+            if points_rate is not None and points_rate > 0:
+                points_discount = int(original_price * (points_rate / 100))
+                price_after_discounts -= points_discount
+                adjusted_item['points_discount'] = points_discount
+                logger.debug(f"적립금 선할인 {points_rate}% 적용: {points_discount}원")
+            
+            # 2. 카드 할인 적용
+            if card_discount is not None:
+                card_discount_amount = 0
+                if card_discount['type'] == 'threshold':
+                    # 임계값 기반 할인 (예: 3만원 이상 3천원)
+                    if card_discount['condition'] == 'gte' and price_after_discounts >= card_discount['base_amount']:
+                        card_discount_amount = card_discount['discount_amount']
+                    elif card_discount['condition'] == 'gt' and price_after_discounts > card_discount['base_amount']:
+                        card_discount_amount = card_discount['discount_amount']
+                else:  # proportional
+                    # 비례 할인 (예: 5만원당 5천원)
+                    card_discount_amount = int(price_after_discounts / card_discount['base_amount']) * card_discount['discount_amount']
+                
+                price_after_discounts -= card_discount_amount
+                adjusted_item['card_discount'] = card_discount_amount
+                if card_discount_amount > 0:
+                    logger.debug(f"카드 할인 적용: {card_discount_amount}원")
+            
+            # 3. 기본 할인율 적용 (전략에 정의된 할인)
+            basic_discount_amount = 0
             for adj_type, adj_config in adjustments.items():
                 if adj_config.get('enabled', False):
                     rate = adj_config.get('rate', 0)
                     max_amount = adj_config.get('max_amount', float('inf'))
                     
-                    discount = min(price * rate, max_amount)
-                    price = price - discount
+                    discount = min(price_after_discounts * rate, max_amount)
+                    price_after_discounts -= discount
+                    basic_discount_amount += discount
                     
                     logger.debug(f"{adj_type} 할인 적용: {discount}원")
             
-            adjusted_item['adjusted_price'] = int(price)
-            adjusted_item['discount_amount'] = original_price - int(price)
-            adjusted_item['discount_rate'] = (original_price - int(price)) / original_price
+            adjusted_item['basic_discount'] = basic_discount_amount
+            
+            # 최종 가격 및 총 할인금액 계산
+            adjusted_item['adjusted_price'] = int(price_after_discounts)
+            adjusted_item['discount_amount'] = original_price - int(price_after_discounts)
+            adjusted_item['discount_rate'] = (original_price - int(price_after_discounts)) / original_price if original_price > 0 else 0
+            
+            # 음수 가격 방지
+            if adjusted_item['adjusted_price'] < 0:
+                adjusted_item['adjusted_price'] = 0
+                adjusted_item['discount_amount'] = original_price
             
             adjusted_items.append(adjusted_item)
             
