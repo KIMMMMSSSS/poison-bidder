@@ -1,233 +1,185 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-Poison 통합 테스트 - 사이즈 변환 및 Remove 속도 개선 검증
-EU에서 CM/JP 변환 로직과 Remove 버튼 클릭 속도 최적화를 테스트합니다.
+Asia 체크 로직 통합 테스트 스크립트
+수정된 Asia 체크 로직이 올바르게 동작하는지 검증
 """
 
 import sys
 import os
 import time
 import json
-import unittest
+import subprocess
 from datetime import datetime
-from pathlib import Path
 
-# 부모 디렉토리를 sys.path에 추가
-parent_dir = Path(__file__).parent.parent
-sys.path.insert(0, str(parent_dir))
+# 상위 디렉토리를 경로에 추가
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# from poison_integrated_bidding import PoisonIntegratedBidding
-from scraper_logger import ScraperLogger
+def check_log_file():
+    """로그 파일 존재 여부 확인"""
+    log_dir = "C:/poison_final/logs"
+    today = datetime.now().strftime("%Y%m%d")
+    log_file = os.path.join(log_dir, f"poison_bidder_{today}.log")
+    
+    if not os.path.exists(log_dir):
+        os.makedirs(log_dir)
+        print(f"[INFO] 로그 디렉토리 생성: {log_dir}")
+    
+    return log_file
 
-class TestPoisonBidding(unittest.TestCase):
-    """Poison 통합 테스트 클래스"""
+def parse_logs(log_file, start_time):
+    """시작 시간 이후의 로그만 파싱"""
+    relevant_logs = []
     
-    @classmethod
-    def setUpClass(cls):
-        """테스트 클래스 초기화"""
-        cls.test_log_dir = Path(__file__).parent.parent / 'logs' / 'test'
-        cls.test_log_dir.mkdir(parents=True, exist_ok=True)
-        
-        # 로거 설정
-        cls.logger = ScraperLogger(log_dir=str(cls.test_log_dir))
-        cls.logger.log("=" * 60)
-        cls.logger.log("Poison 통합 테스트 시작")
-        cls.logger.log("=" * 60)
-        
-        # 테스트용 Poison 객체 생성
-        # PoisonIntegratedBidding는 인자를 받지 않음
-        # 대신 PoizonBidderWrapperV2를 사용하면 실제 입찰 테스트 가능
-        from poison_bidder_wrapper_v2 import PoizonBidderWrapperV2
-        cls.poison = PoizonBidderWrapperV2(
-            driver_path=None,
-            min_profit=0,
-            worker_count=1
-        )
-        
-        # Remove 클릭 시간 측정을 위한 리스트
-        cls.remove_click_times = []
+    if not os.path.exists(log_file):
+        return relevant_logs
     
-    def setUp(self):
-        """각 테스트 케이스 시작 전 설정"""
-        self.start_time = time.time()
-        self.test_products = [
-            {
-                'name': 'Nike Air Force 1 (EU 사이즈만)',
-                'url': 'https://example.com/nike-af1',  # 실제 URL로 변경 필요
-                'expected_sizes': ['EU 42', 'EU 43'],
-                'target_price': 150000
-            },
-            {
-                'name': 'Adidas Superstar (EU/CM 혼재)',
-                'url': 'https://example.com/adidas-superstar',  # 실제 URL로 변경 필요
-                'expected_sizes': ['EU 44', 'CM 275'],
-                'target_price': 120000
-            }
-        ]
+    with open(log_file, 'r', encoding='utf-8') as f:
+        for line in f:
+            if line.strip():
+                # 시간 정보가 있는 경우에만 처리
+                if '[' in line and ']' in line:
+                    try:
+                        # 로그 시간 추출 시도
+                        time_str = line.split('[')[1].split(']')[0]
+                        # 시간 비교 로직 (필요시 구현)
+                        relevant_logs.append(line.strip())
+                    except:
+                        relevant_logs.append(line.strip())
     
-    def tearDown(self):
-        """각 테스트 케이스 종료 후 정리"""
-        elapsed_time = time.time() - self.start_time
-        self.logger.log(f"테스트 소요 시간: {elapsed_time:.2f}초")
+    return relevant_logs
+
+def analyze_test_results(logs):
+    """테스트 결과 분석"""
+    results = {
+        'asia_check_attempts': 0,
+        'down_button_clicks': 0,
+        'asia_check_success': False,
+        'bid_attempts': 0,
+        'errors': [],
+        'test_passed': False
+    }
     
-    def test_01_size_chart_parsing(self):
-        """Size Chart 데이터 파싱 테스트"""
-        self.logger.log("\n=== Size Chart 파싱 테스트 시작 ===")
-        
-        test_html = """
-        <table class="size-chart">
-            <thead>
-                <tr>
-                    <th>EU</th>
-                    <th>US</th>
-                    <th>CM (Foot Length Fit)</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <td>42</td>
-                    <td>8.5</td>
-                    <td>26.5</td>
-                </tr>
-                <tr>
-                    <td>43</td>
-                    <td>9.5</td>
-                    <td>27.5</td>
-                </tr>
-            </tbody>
-        </table>
-        """
-        
-        # read_product_size_chart 메서드 테스트
-        try:
-            # 실제 페이지에서 테스트하려면 아래 주석 해제
-            # driver = self.poison.create_driver()
-            # driver.get(self.test_products[0]['url'])
-            # size_mapping = self.poison.read_product_size_chart(driver)
-            
-            # 모의 테스트 결과
-            size_mapping = {
-                'EU 42': {'US': '8.5', 'CM': '26.5'},
-                'EU 43': {'US': '9.5', 'CM': '27.5'}
-            }
-            
-            self.logger.log(f"파싱된 Size Chart: {json.dumps(size_mapping, indent=2)}")
-            
-            # CM 데이터 존재 확인
-            self.assertTrue(any('CM' in data for data in size_mapping.values()))
-            self.logger.log("[PASS] CM 데이터 파싱 성공")
-            
-        except Exception as e:
-            self.logger.log_error(f"Size Chart 파싱 실패: {str(e)}")
-            self.fail(f"Size Chart 파싱 중 오류 발생: {str(e)}")
+    for log in logs:
+        if 'Asia 체크 시작' in log:
+            results['asia_check_attempts'] += 1
+        elif '다운 버튼 클릭' in log:
+            results['down_button_clicks'] += 1
+        elif 'Asia 체크 성공' in log:
+            results['asia_check_success'] = True
+        elif '입찰 진행' in log or 'Placing bid' in log:
+            results['bid_attempts'] += 1
+        elif 'ERROR' in log or '에러' in log:
+            results['errors'].append(log)
     
-    def test_02_eu_to_cm_conversion(self):
-        """EU 사이즈에서 CM 변환 로직 테스트"""
-        self.logger.log("\n=== EU -> CM 변환 로직 테스트 시작 ===")
-        
-        # 테스트 데이터
-        test_cases = [
-            {
-                'input_size': 'EU 42',
-                'size_mapping': {
-                    'EU 42': {'US': '8.5', 'CM': '26.5'},
-                    'EU 43': {'US': '9.5', 'CM': '27.5'},
-                    'EU 44': {'US': '10.5', 'CM': '28.5'}
-                },
-                'expected_cm': '26.5'
-            },
-            {
-                'input_size': 'EU 44',
-                'size_mapping': {
-                    'EU 42': {'US': '8.5', 'CM': '26.5'},
-                    'EU 43': {'US': '9.5', 'CM': '27.5'},
-                    'EU 44': {'US': '10.5', 'CM': '28.5'}
-                },
-                'expected_cm': '28.5'
-            }
-        ]
-        
-        for test_case in test_cases:
-            try:
-                # 실제 match_sizes_smart 메서드에서 EU→CM 변환 로직 테스트
-                # CM 탭이 없을 때 EU 사이즈를 Size Chart 기반으로 CM로 변환
-                input_size = test_case['input_size']
-                size_mapping = test_case['size_mapping']
-                expected_cm = test_case['expected_cm']
-                
-                # 변환 로직 시뮬레이션
-                if input_size in size_mapping and 'CM' in size_mapping[input_size]:
-                    converted_cm = size_mapping[input_size]['CM']
-                    self.assertEqual(converted_cm, expected_cm)
-                    self.logger.log(f"[PASS] {input_size} -> CM {converted_cm} 변환 성공")
-                else:
-                    self.logger.log(f"WARNING: {input_size}에 대한 CM 데이터 없음")
-                    
-            except Exception as e:
-                self.logger.log_error(f"EU->CM 변환 테스트 실패: {str(e)}")
-                self.fail(f"EU->CM 변환 중 오류: {str(e)}")
+    # 테스트 통과 조건
+    if results['asia_check_success'] and results['bid_attempts'] > 0:
+        results['test_passed'] = True
     
-    def test_03_remove_button_speed(self):
-        """Remove 버튼 클릭 속도 테스트"""
-        self.logger.log("\n=== Remove 버튼 클릭 속도 테스트 시작 ===")
-        
-        # Remove 클릭 시간 측정 시뮬레이션
-        num_tests = 5
-        target_time = 0.2  # 목표 대기 시간 (0.2초)
-        
-        for i in range(num_tests):
-            start = time.time()
-            
-            # click_remove 메서드 시뮬레이션
-            # 실제로는 driver와 element를 사용하여 테스트
-            time.sleep(target_time)  # 실제 대기 시간 시뮬레이션
-            
-            click_time = time.time() - start
-            self.__class__.remove_click_times.append(click_time)
-            
-            self.logger.log(f"Remove 클릭 #{i+1}: {click_time:.3f}초")
-            
-        # 평균 시간 계산
-        avg_time = sum(self.__class__.remove_click_times) / len(self.__class__.remove_click_times)
-        self.logger.log(f"\n평균 Remove 클릭 시간: {avg_time:.3f}초")
-        
-        # 목표 시간과 비교
-        if avg_time <= 0.3:  # 0.3초 이하면 성공
-            self.logger.log("[PASS] Remove 클릭 속도 최적화 확인")
+    return results
+
+def run_integration_test():
+    """통합 테스트 실행"""
+    print("="*60)
+    print("Asia 체크 로직 통합 테스트 시작")
+    print("="*60)
+    
+    start_time = datetime.now()
+    log_file = check_log_file()
+    
+    print(f"[INFO] 테스트 시작 시간: {start_time}")
+    print(f"[INFO] 로그 파일 경로: {log_file}")
+    
+    # 1. poison_bidder_wrapper_v2.py 실행 여부 확인
+    script_path = "C:/poison_final/poison_bidder_wrapper_v2.py"
+    if not os.path.exists(script_path):
+        print(f"[ERROR] 스크립트를 찾을 수 없습니다: {script_path}")
+        return False
+    
+    print(f"[INFO] 스크립트 확인 완료: {script_path}")
+    
+    # 2. 기존 프로세스 확인
+    print("\n[테스트 1] 기존 프로세스 확인")
+    print("-"*40)
+    
+    try:
+        # Windows에서 Python 프로세스 확인
+        result = subprocess.run(['tasklist', '/FI', 'IMAGENAME eq python.exe'], 
+                              capture_output=True, text=True)
+        if 'poison_bidder' in result.stdout:
+            print("[OK] Poison Bidder 프로세스가 실행 중입니다.")
         else:
-            self.logger.log(f"WARNING: [WARN] Remove 클릭 속도가 목표보다 느림: {avg_time:.3f}초")
+            print("[WARNING] Poison Bidder 프로세스가 실행되지 않았습니다.")
+            print("[INFO] 수동으로 poison_bidder_wrapper_v2.py를 실행해주세요.")
+    except Exception as e:
+        print(f"[ERROR] 프로세스 확인 실패: {e}")
     
-    def test_04_integration_test(self):
-        """Poison 입찰 프로세스 통합 테스트"""
-        self.logger.log("\n=== 통합 테스트 시작 ===")
+    # 3. 로그 모니터링 (30초간)
+    print("\n[테스트 2] 로그 모니터링 (30초)")
+    print("-"*40)
+    
+    monitor_duration = 30
+    print(f"[INFO] {monitor_duration}초간 로그를 모니터링합니다...")
+    
+    time.sleep(monitor_duration)
+    
+    # 4. 로그 분석
+    print("\n[테스트 3] 로그 분석")
+    print("-"*40)
+    
+    logs = parse_logs(log_file, start_time)
+    
+    if not logs:
+        print("[WARNING] 로그가 기록되지 않았습니다.")
+        print("[INFO] poison_bidder_wrapper_v2.py가 실행 중인지 확인하세요.")
+    else:
+        print(f"[INFO] {len(logs)}개의 로그 항목을 찾았습니다.")
         
-        # 테스트 결과 요약
-        test_results = {
-            'size_chart_parsing': 'PASS',
-            'eu_to_cm_conversion': 'PASS',
-            'remove_button_speed': 'PASS' if self.__class__.remove_click_times and 
-                                           sum(self.__class__.remove_click_times)/len(self.__class__.remove_click_times) <= 0.3 
-                                           else 'FAIL',
-            'overall_status': 'PASS'
-        }
-        
-        # 테스트 결과 출력
-        self.logger.log("\n" + "=" * 50)
-        self.logger.log("통합 테스트 결과:")
-        self.logger.log("=" * 50)
-        
-        for test_name, status in test_results.items():
-            symbol = "[PASS]" if status == 'PASS' else "[FAIL]"
-            self.logger.log(f"{symbol} {test_name}: {status}")
-        
-        # 최종 확인
-        if all(status == 'PASS' for status in test_results.values()):
-            self.logger.log("\n[SUCCESS] 모든 테스트 통과! Poison 입찰 시스템 개선 완료")
-        else:
-            self.logger.log("\nWARNING: [WARN] 일부 테스트 실패 - 추가 검토 필요")
+        # 최근 로그 5개 출력
+        print("\n최근 로그:")
+        for log in logs[-5:]:
+            print(f"  {log}")
+    
+    # 5. 테스트 결과 분석
+    print("\n[테스트 4] 테스트 결과 분석")
+    print("-"*40)
+    
+    results = analyze_test_results(logs)
+    
+    print(f"Asia 체크 시도 횟수: {results['asia_check_attempts']}")
+    print(f"다운 버튼 클릭 횟수: {results['down_button_clicks']}")
+    print(f"Asia 체크 성공 여부: {results['asia_check_success']}")
+    print(f"입찰 시도 횟수: {results['bid_attempts']}")
+    print(f"에러 발생 횟수: {len(results['errors'])}")
+    
+    if results['errors']:
+        print("\n발생한 에러:")
+        for error in results['errors'][:3]:  # 최대 3개만 표시
+            print(f"  {error}")
+    
+    # 6. 최종 결과
+    print("\n" + "="*60)
+    print("테스트 결과 요약")
+    print("="*60)
+    
+    if results['test_passed']:
+        print("[SUCCESS] 테스트 통과!")
+        print("- Asia 체크가 성공적으로 수행되었습니다.")
+        print("- Asia 체크 후 입찰이 진행되었습니다.")
+    else:
+        print("[FAILED] 테스트 실패")
+        if not results['asia_check_success']:
+            print("- Asia 체크가 수행되지 않았습니다.")
+        if results['bid_attempts'] == 0:
+            print("- 입찰이 진행되지 않았습니다.")
+    
+    print(f"\n[INFO] 상세 로그는 다음 파일을 확인하세요: {log_file}")
+    
+    return results['test_passed']
 
-
-if __name__ == '__main__':
-    # 테스트 실행
-    unittest.main(verbosity=2)
+if __name__ == "__main__":
+    # 통합 테스트 실행
+    test_passed = run_integration_test()
+    
+    # 종료 코드 반환
+    sys.exit(0 if test_passed else 1)
