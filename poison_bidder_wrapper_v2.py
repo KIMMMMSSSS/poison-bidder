@@ -2165,19 +2165,30 @@ class PoizonAutoBidderWorker:
                         if asia_checked:
                             self.log_to_queue(f"[SUCCESS] Asia 체크 성공! (시도: {asia_attempt}회)")
                             
-                            # Asia 체크 성공 후 정보 재추출
+                            # === Asia 체크 성공 - 이제 입찰 가능 상태 ===
+                            # 예상수익 재계산 (가격 변경 후)
                             est_payout = self.find_est_payout(row)
                             profit = est_payout - cost
                             
-                            # 수익 조건 확인
-                            if est_payout >= cost and profit >= self.min_profit:
-                                self.log_to_queue(f"[OK] 입찰조건 충족: {matched_text} (수익: {profit}원)")
-                                successful.append(match_info)
-                                bid_success = True
-                                all_failed = False
+                            # 수익 조건 검증 (Asia 체크가 확인된 후에만 수행)
+                            self.log_to_queue(f"[VERIFY] 예상수익: {est_payout:,}, 기준가: {cost:,}, 수익: {profit:,}")
+                            
+                            if est_payout >= cost:  # 기본 조건: 예상수익 ≥ 기준가
+                                if profit >= self.min_profit:  # 추가 조건: 수익 ≥ 최소수익
+                                    # === 모든 조건 충족 - 입찰 진행 ===
+                                    self.log_to_queue(f"[OK] 입찰조건 충족: {matched_text} (수익: {profit}원)")
+                                    successful.append(match_info)  # 성공 목록에 추가
+                                    bid_success = True
+                                    all_failed = False
+                                else:
+                                    # 최소수익 미달
+                                    self.log_to_queue(f"[INFO] 최소수익 미달 ({profit:,} < {self.min_profit:,}) - Remove")
+                                    self.log_fail(idx, brand_name, code, color, size, cost, f'Asia체크후최소수익미달')
+                                    self.click_remove(row)
                             else:
-                                self.log_to_queue(f"[INFO] Asia 체크 후 수익 조건 미충족 - Remove")
-                                self.log_fail(idx, brand_name, code, color, size, cost, f'Asia체크후수익미달 {profit}')
+                                # 예상수익 < 기준가
+                                self.log_to_queue(f"[INFO] 예상수익 부족 ({est_payout:,} < {cost:,}) - Remove")
+                                self.log_fail(idx, brand_name, code, color, size, cost, f'Asia체크후예상수익부족')
                                 self.click_remove(row)
                             break  # Asia 체크 루프 종료
                         
