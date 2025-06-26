@@ -445,6 +445,7 @@
   - 포이즌 로그인 정보 변경 시 환경변수 업데이트
   - 무신사 로그인 기능 추가 시 `LoginManager` 클래스 사용
   - 멀티프로세싱 워커 수정 시 쿠키 공유 로직 확인
+  - **페이지 로딩 재시도 로직 추가 시 위 '포이즌 봇 페이지 로딩 재시도 규칙' 섹션 준수**
 
 ## 테스트 및 디버깅 규칙
 
@@ -665,6 +666,137 @@ LOG_LEVEL=INFO
           f"📝 {message}"
       )
   ```
+
+## 포이즌 봇 페이지 로딩 재시도 규칙 ⚠️ CRITICAL
+
+### 페이지 로딩 실패 처리
+- **필수**: 모든 WebDriverWait 작업에 재시도 로직 구현
+- **필수**: TimeoutException 발생 시 바로 raise하지 않고 재시도
+- **최대 재시도**: 3회 (대기 시간 점진적 증가: 10초 → 15초 → 20초)
+- **재시도 전**: driver.refresh()로 페이지 새로고침
+- **마지막 실패**: 홈 페이지로 이동 후 처음부터 재시작
+
+### Create listings 버튼 처리
+- **위치**: poison_bidder_wrapper_v2.py의 create_listings 메서드
+- **현재 문제**: TimeoutException 시 바로 Exception raise
+- **개선 구현**:
+  ```python
+  def create_listings_with_retry(self, max_retries=3):
+      """Create listings 버튼 클릭 (재시도 포함)"""
+      for attempt in range(max_retries):
+          try:
+              wait_time = 10 + (attempt * 5)
+              self.log_to_queue(f"[STEP] Create listings 찾기 시도 {attempt + 1}/{max_retries}")
+              
+              # 리스트 로드 대기
+              self.wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, 'tbody.ant-table-tbody tr')))
+              
+              # Create listings 버튼 클릭
+              create_btn = WebDriverWait(self.driver, wait_time).until(
+                  EC.element_to_be_clickable((By.XPATH, "//button[.//span[text()='Create listings']]"))
+              )
+              create_btn.click()
+              
+              # 리전 탭이 나타날 때까지 대기
+              WebDriverWait(self.driver, 5).until(
+                  EC.presence_of_element_located((By.XPATH, "//div[@class='tabItem___vEvcb']"))
+              )
+              self.log_to_queue("[OK] Create listings 완료")
+              return True
+              
+          except TimeoutException:
+              if attempt < max_retries - 1:
+                  self.log_to_queue(f"[RETRY] Create listings 버튼 못 찾음, 페이지 새로고침...")
+                  self.driver.refresh()
+                  time.sleep(5)
+              else:
+                  self.log_to_queue("[ERROR] Create listings 버튼을 찾을 수 없음, 홈으로 이동")
+                  self.driver.get("https://seller.poizon.com/main/dataBoard")
+                  return False
+  ```
+
+### 검색 결과 대기 강화
+- **필수**: 로딩 스피너 사라질 때까지 대기
+- **필수**: 검색 결과 컨테이너 확인
+- **추가 대기**: JavaScript 렌더링 완료를 위한 2초
+- **구현 예시**:
+  ```python
+  def wait_for_search_results(self, timeout=30):
+      """검색 결과가 완전히 로드될 때까지 대기"""
+      try:
+          # 1. 로딩 스피너가 사라질 때까지 대기
+          WebDriverWait(self.driver, 10).until_not(
+              EC.presence_of_element_located((By.CLASS_NAME, "loading-spinner"))
+          )
+          
+          # 2. 검색 결과 컨테이너가 나타날 때까지 대기
+          WebDriverWait(self.driver, timeout).until(
+              EC.presence_of_element_located((By.CLASS_NAME, "search-result-container"))
+          )
+          
+          # 3. 추가로 2초 대기 (JavaScript 렌더링 완료)
+          time.sleep(2)
+          
+          return True
+      except:
+          return False
+  ```
+
+### 재시도 래퍼 데코레이터
+- **적용 대상**: 모든 페이지 요소 찾기 작업
+- **오류 키워드**: 'timeout', 'element', 'not found', 'button'
+- **복구 전략**: refresh() 실패 시 홈 페이지로 이동
+- **구현 예시**:
+  ```python
+  def retry_on_page_load_failure(func):
+      """페이지 로딩 실패 시 자동 재시도하는 데코레이터"""
+      def wrapper(self, *args, **kwargs):
+          max_retries = 3
+          
+          for attempt in range(max_retries):
+              try:
+                  return func(self, *args, **kwargs)
+                  
+              except Exception as e:
+                  error_msg = str(e).lower()
+                  
+                  # 페이지 로딩 관련 오류인지 확인
+                  if any(keyword in error_msg for keyword in ['timeout', 'element', 'not found', 'button']):
+                      if attempt < max_retries - 1:
+                          self.log_to_queue(f"[RETRY {attempt + 1}] 페이지 로딩 문제 감지: {e}")
+                          
+                          # 페이지 상태 복구 시도
+                          try:
+                              self.driver.refresh()
+                              time.sleep(5)
+                          except:
+                              # refresh도 실패하면 홈으로
+                              self.driver.get("https://seller.poizon.com/search")
+                              time.sleep(5)
+                      else:
+                          self.log_to_queue(f"[FAIL] 최대 재시도 횟수 초과: {e}")
+                          raise
+                  else:
+                      # 페이지 로딩과 무관한 오류는 바로 발생
+                      raise
+                      
+      return wrapper
+  ```
+
+### 페이지 상태 감지 및 복구
+- **필수 체크 항목**:
+  - 현재 URL이 로그인 페이지인지 확인
+  - 에러 페이지 감지 (404, 500 등)
+  - 주요 요소 존재 확인 (검색창, 버튼 등)
+- **복구 전략**:
+  - 로그인 페이지: 재로그인 시도
+  - 에러 페이지: 홈으로 이동 후 재시도
+  - 요소 없음: 페이지 새로고침
+
+### 재시도 로직 적용 우선순위
+1. **최우선**: create_listings, search_product, setup_regions
+2. **중요**: match_sizes_smart, process_bids, confirm_bids
+3. **선택**: click_apply, setup_pricing
 
 ## Shrimp Task Manager 사용 규칙 ⚠️ CRITICAL
 
