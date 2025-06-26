@@ -2068,13 +2068,25 @@ class PoizonAutoBidderWorker:
             self.log_to_queue(f"[ERROR] Apply 버튼 클릭 실패: {type(e).__name__}")
 
     def process_bids(self, matched, code, brand):
-        self.log_to_queue("[STEP] 입찰 처리")
+        import time as timer  # 시간 측정을 위한 import
+        process_start_time = timer.time()
+        
+        self.log_to_queue("\n" + "="*60)
+        self.log_to_queue(f"[STEP] 입찰 처리 시작 - 코드: {code}, 브랜드: {brand}")
+        self.log_to_queue(f"[INFO] 처리할 사이즈: {len(matched)}개")
+        self.log_to_queue("="*60)
+        
         successful = []
         all_failed = True  # 모든 입찰이 실패했는지 추적
+        asia_check_stats = {"success": 0, "failed": 0, "removed": 0}  # 통계 정보
         
         for match_info in matched:
             idx, brand_name, code, color, size, cost, matched_text = match_info
-            self.log_to_queue(f"\n[PROCESS] {matched_text} 입찰 시작")
+            item_start_time = timer.time()
+            
+            self.log_to_queue(f"\n[PROCESS] {matched_text} 입찰 시작 ({len(successful)+1}/{len(matched)})")
+            self.log_to_queue(f"[DEBUG] 상세정보 - IDX: {idx}, 색상: {color}, 사이즈: {size}, 기준가: {cost:,}")
+            
             retry_count = 0
             consecutive_fails = 0
             bid_success = False  # 개별 입찰 성공 여부
@@ -2164,6 +2176,7 @@ class PoizonAutoBidderWorker:
                         
                         if asia_checked:
                             self.log_to_queue(f"[SUCCESS] Asia 체크 성공! (시도: {asia_attempt}회)")
+                            asia_check_stats["success"] += 1
                             
                             # === Asia 체크 성공 - 이제 입찰 가능 상태 ===
                             # 예상수익 재계산 (가격 변경 후)
@@ -2176,20 +2189,22 @@ class PoizonAutoBidderWorker:
                             if est_payout >= cost:  # 기본 조건: 예상수익 ≥ 기준가
                                 if profit >= self.min_profit:  # 추가 조건: 수익 ≥ 최소수익
                                     # === 모든 조건 충족 - 입찰 진행 ===
-                                    self.log_to_queue(f"[OK] 입찰조건 충족: {matched_text} (수익: {profit}원)")
+                                    self.log_to_queue(f"[OK] ✓ 입찰조건 충족: {matched_text} (수익: {profit}원)")
                                     successful.append(match_info)  # 성공 목록에 추가
                                     bid_success = True
                                     all_failed = False
                                 else:
                                     # 최소수익 미달
-                                    self.log_to_queue(f"[INFO] 최소수익 미달 ({profit:,} < {self.min_profit:,}) - Remove")
+                                    self.log_to_queue(f"[INFO] ✗ 최소수익 미달 ({profit:,} < {self.min_profit:,}) - Remove")
                                     self.log_fail(idx, brand_name, code, color, size, cost, f'Asia체크후최소수익미달')
                                     self.click_remove(row)
+                                    asia_check_stats["removed"] += 1
                             else:
                                 # 예상수익 < 기준가
-                                self.log_to_queue(f"[INFO] 예상수익 부족 ({est_payout:,} < {cost:,}) - Remove")
+                                self.log_to_queue(f"[INFO] ✗ 예상수익 부족 ({est_payout:,} < {cost:,}) - Remove")
                                 self.log_fail(idx, brand_name, code, color, size, cost, f'Asia체크후예상수익부족')
                                 self.click_remove(row)
+                                asia_check_stats["removed"] += 1
                             break  # Asia 체크 루프 종료
                         
                         # 현재 가격 확인 (디버깅)
@@ -2206,22 +2221,33 @@ class PoizonAutoBidderWorker:
                     
                     # 최대 시도 횟수 초과
                     if asia_attempt >= max_asia_attempts and not asia_checked:
-                        self.log_to_queue(f"[FAIL] Asia 체크 실패 - 최대 시도 횟수 초과")
+                        self.log_to_queue(f"[FAIL] ✗ Asia 체크 실패 - 최대 시도 횟수 초과")
                         self.log_fail(idx, brand_name, code, color, size, cost, 'Asia체크실패-최대시도초과')
                         self.click_remove(row)
+                        asia_check_stats["failed"] += 1
+                    
+                    # 개별 아이템 처리 시간
+                    item_elapsed = timer.time() - item_start_time
+                    self.log_to_queue(f"[TIME] {matched_text} 처리 시간: {item_elapsed:.1f}초")
                     
                     break  # while 루프 종료
                         
                 except StaleElementReferenceException:
                     retry_count += 1
                     self.log_to_queue(f"[RETRY] DOM 변경 감지, 재시도 {retry_count}/{MAX_RETRIES}")
+                    self.log_to_queue(f"[DEBUG] 상태: Row 요소가 업데이트됨 - 재탐색 필요")
                     time.sleep(1)
                 except NoSuchElementException:
-                    self.log_to_queue(f"[ERROR] {matched_text} row를 찾을 수 없음")
+                    self.log_to_queue(f"[ERROR] ✗ {matched_text} row를 찾을 수 없음")
+                    self.log_to_queue(f"[DEBUG] XPath: //tr[.//div[contains(text(),'{matched_text}')]]")
                     self.log_fail(idx, brand_name, code, color, size, cost, "row 못찾음")
+                    asia_check_stats["failed"] += 1
                     break
                 except Exception as e:
-                    self.log_to_queue(f"[ERROR] 예상치 못한 오류: {type(e).__name__} - {e}")
+                    self.log_to_queue(f"[ERROR] ✗ 예상치 못한 오류: {type(e).__name__}")
+                    self.log_to_queue(f"[DEBUG] 오류 상세: {str(e)}")
+                    self.log_to_queue(f"[DEBUG] 마지막 단계: {asia_attempt if 'asia_attempt' in locals() else 'N/A'}")
+                    asia_check_stats["failed"] += 1
                     break
         
         # 모든 입찰이 실패한 경우 뒤로 가기
@@ -2229,6 +2255,15 @@ class PoizonAutoBidderWorker:
             self.log_to_queue("\n[WARN] 모든 사이즈 입찰 실패 - 가격 조정 불가")
             self.go_back_and_reset()
             return []  # 빈 리스트 반환하여 Confirm 단계 스킵
+        
+        # 프로세스 완료 요약
+        process_elapsed = timer.time() - process_start_time
+        self.log_to_queue("\n" + "="*60)
+        self.log_to_queue(f"[SUMMARY] 입찰 처리 완료 - 코드: {code}")
+        self.log_to_queue(f"[RESULT] 성공: {len(successful)}/{len(matched)} 개")
+        self.log_to_queue(f"[STATS] Asia 체크 - 성공: {asia_check_stats['success']}, 실패: {asia_check_stats['failed']}, Remove: {asia_check_stats['removed']}")
+        self.log_to_queue(f"[TIME] 전체 처리 시간: {process_elapsed:.1f}초 (평균: {process_elapsed/len(matched) if matched else 0:.1f}초/개)")
+        self.log_to_queue("="*60 + "\n")
                     
         return successful
 
