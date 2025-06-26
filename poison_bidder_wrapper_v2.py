@@ -13,6 +13,7 @@ import time
 import re
 import pickle
 import traceback
+import functools
 from pathlib import Path
 from datetime import datetime
 from collections import defaultdict
@@ -613,6 +614,66 @@ class MusinsaBidderAdapter:
             return None
 
 
+# 재시도 데코레이터 구현
+def retry_on_page_load_failure(max_retries=3, base_wait=2):
+    """
+    페이지 로딩 실패 시 자동으로 재시도하는 데코레이터
+    
+    Args:
+        max_retries: 최대 재시도 횟수 (기본: 3)
+        base_wait: 기본 대기 시간 (기본: 2초, 재시도마다 증가)
+    """
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(self, *args, **kwargs):
+            last_exception = None
+            
+            for attempt in range(max_retries + 1):
+                try:
+                    # 함수 실행
+                    return func(self, *args, **kwargs)
+                    
+                except TimeoutException as e:
+                    last_exception = e
+                    
+                    # 마지막 시도가 아닌 경우 재시도
+                    if attempt < max_retries:
+                        wait_time = base_wait * (attempt + 1)  # 점진적 대기 시간 증가
+                        self.log_to_queue(f"[RETRY] TimeoutException 발생 - {attempt + 1}/{max_retries} 재시도")
+                        self.log_to_queue(f"[RETRY] {wait_time}초 대기 후 페이지 새로고침...")
+                        
+                        try:
+                            # 페이지 새로고침
+                            self.driver.refresh()
+                            time.sleep(wait_time)
+                            self.log_to_queue("[RETRY] 페이지 새로고침 완료")
+                        except Exception as refresh_error:
+                            self.log_to_queue(f"[ERROR] 페이지 새로고침 실패: {type(refresh_error).__name__}")
+                    else:
+                        # 모든 재시도 실패 시 홈으로 이동
+                        self.log_to_queue(f"[ERROR] {max_retries}회 재시도 후에도 실패 - 홈으로 이동")
+                        try:
+                            self.driver.get("https://seller.poizon.com/main/dataBoard")
+                            time.sleep(3)
+                            self.log_to_queue("[INFO] 홈 페이지로 이동 완료")
+                        except Exception as home_error:
+                            self.log_to_queue(f"[ERROR] 홈 이동 실패: {type(home_error).__name__}")
+                        
+                        # 원래 예외 다시 발생
+                        raise last_exception
+                        
+                except Exception as e:
+                    # TimeoutException이 아닌 다른 예외는 그대로 전달
+                    raise e
+                    
+            # 모든 재시도 실패
+            if last_exception:
+                raise last_exception
+                
+        return wrapper
+    return decorator
+
+
 # PoizonAutoBidderWorker 클래스 (모듈 레벨로 이동)
 class PoizonAutoBidderWorker:
     """워커용 PoizonAutoBidder 클래스"""
@@ -723,6 +784,159 @@ class PoizonAutoBidderWorker:
                 
         except Exception as e:
             self.log_to_queue(f"[WARN] 검색창 초기화 실패: {type(e).__name__}")
+            return False
+
+    def check_page_health(self):
+        """
+        페이지가 정상적으로 로드되었는지 확인
+        
+        Returns:
+            bool: 페이지가 완전히 로드되고 정상 상태면 True, 그렇지 않으면 False
+        """
+        try:
+            # 1. document.readyState 확인
+            ready_state = self.driver.execute_script("return document.readyState")
+            if ready_state != "complete":
+                self.log_to_queue(f"[WARN] 페이지 로딩 미완료: readyState={ready_state}")
+                return False
+            
+            # 2. 주요 요소 존재 여부 확인 (JavaScript로 빠르게 체크)
+            elements_check = self.driver.execute_script("""
+                // 검색창 확인
+                var searchBox = document.getElementById('Item Info');
+                if (!searchBox) {
+                    return {success: false, missing: 'search_box'};
+                }
+                
+                // Create listings 버튼 확인
+                var createBtn = document.querySelector("button[class*='ant-btn']");
+                if (!createBtn) {
+                    // 버튼이 없어도 검색창이 있으면 기본 페이지는 로드된 것
+                    return {success: true, warning: 'no_create_button'};
+                }
+                
+                // 테이블 존재 여부 확인 (선택적)
+                var table = document.querySelector("tbody.ant-table-tbody");
+                
+                return {
+                    success: true,
+                    searchBox: searchBox ? true : false,
+                    createBtn: createBtn ? true : false,
+                    table: table ? true : false
+                };
+            """)
+            
+            if not elements_check['success']:
+                self.log_to_queue(f"[WARN] 필수 요소 누락: {elements_check.get('missing', 'unknown')}")
+                return False
+            
+            # 3. 페이지 에러 메시지 확인
+            error_check = self.driver.execute_script("""
+                // 에러 메시지나 알림 확인
+                var errorElements = document.querySelectorAll('.ant-message-error, .ant-alert-error');
+                if (errorElements.length > 0) {
+                    return {hasError: true, count: errorElements.length};
+                }
+                
+                // 로딩 스피너가 여전히 돌고 있는지 확인
+                var spinners = document.querySelectorAll('.ant-spin-spinning');
+                if (spinners.length > 0) {
+                    return {loading: true, count: spinners.length};
+                }
+                
+                return {hasError: false, loading: false};
+            """)
+            
+            if error_check.get('hasError'):
+                self.log_to_queue(f"[WARN] 페이지에 에러 메시지 발견: {error_check['count']}개")
+                return False
+                
+            if error_check.get('loading'):
+                self.log_to_queue(f"[WARN] 페이지 로딩 중: 스피너 {error_check['count']}개")
+                return False
+            
+            # 모든 체크 통과
+            self.log_to_queue("[OK] 페이지 상태 정상")
+            return True
+            
+        except Exception as e:
+            self.log_to_queue(f"[ERROR] 페이지 상태 체크 실패: {type(e).__name__} - {str(e)}")
+            return False
+
+    def wait_for_search_results(self):
+        """
+        검색 결과가 완전히 로드될 때까지 대기
+        로딩 스피너가 사라지고 검색 결과가 나타날 때까지 대기
+        """
+        try:
+            self.log_to_queue("[WAIT] 검색 결과 로딩 대기 중...")
+            
+            # 1. 로딩 스피너가 나타났다가 사라질 때까지 대기
+            try:
+                # 먼저 로딩 스피너가 있는지 확인 (짧은 대기)
+                spinner_present = self.driver.execute_script("""
+                    return document.querySelectorAll('.ant-spin-spinning, .ant-spin-container').length > 0;
+                """)
+                
+                if spinner_present:
+                    self.log_to_queue("[WAIT] 로딩 스피너 감지 - 사라질 때까지 대기")
+                    # 스피너가 사라질 때까지 대기 (최대 10초)
+                    WebDriverWait(self.driver, 10).until_not(
+                        EC.presence_of_element_located((By.CSS_SELECTOR, ".ant-spin-spinning, .ant-spin-container"))
+                    )
+                    self.log_to_queue("[OK] 로딩 스피너 사라짐")
+            except TimeoutException:
+                self.log_to_queue("[WARN] 로딩 스피너 대기 시간 초과")
+            
+            # 2. 검색 결과 테이블이 나타날 때까지 대기
+            try:
+                # 검색 결과 컨테이너 대기
+                WebDriverWait(self.driver, 5).until(
+                    EC.presence_of_element_located((By.CSS_SELECTOR, "tbody.ant-table-tbody"))
+                )
+                
+                # 검색 결과 행이 있는지 확인
+                rows_count = self.driver.execute_script("""
+                    var rows = document.querySelectorAll('tbody.ant-table-tbody tr');
+                    return rows.length;
+                """)
+                
+                if rows_count > 0:
+                    self.log_to_queue(f"[OK] 검색 결과 로드 완료: {rows_count}개 항목")
+                else:
+                    self.log_to_queue("[INFO] 검색 결과 없음")
+                    
+            except TimeoutException:
+                self.log_to_queue("[WARN] 검색 결과 테이블 대기 시간 초과")
+            
+            # 3. JavaScript 렌더링 완료를 위한 추가 대기
+            self.log_to_queue("[WAIT] JavaScript 렌더링 완료 대기 (2초)")
+            time.sleep(2)
+            
+            # 4. 최종 페이지 상태 확인
+            final_check = self.driver.execute_script("""
+                return {
+                    hasSpinner: document.querySelectorAll('.ant-spin-spinning').length > 0,
+                    hasTable: document.querySelector('tbody.ant-table-tbody') !== null,
+                    hasError: document.querySelectorAll('.ant-message-error, .ant-alert-error').length > 0
+                };
+            """)
+            
+            if final_check['hasSpinner']:
+                self.log_to_queue("[WARN] 아직 로딩 중인 요소가 있습니다")
+            
+            if final_check['hasError']:
+                self.log_to_queue("[WARN] 검색 중 에러 메시지 발견")
+                
+            if final_check['hasTable']:
+                self.log_to_queue("[OK] 검색 결과 대기 완료")
+                return True
+            else:
+                self.log_to_queue("[WARN] 검색 결과 테이블을 찾을 수 없음")
+                return False
+                
+        except Exception as e:
+            self.log_to_queue(f"[ERROR] 검색 결과 대기 중 오류: {type(e).__name__} - {str(e)}")
             return False
 
     def process_code(self, code, entries):
@@ -1319,8 +1533,15 @@ class PoizonAutoBidderWorker:
             self.clear_search_box()
             return False
 
+    @retry_on_page_load_failure()
     def create_listings(self):
         self.log_to_queue("[STEP] Create listings")
+        
+        # 페이지 상태 체크
+        if not self.check_page_health():
+            self.log_to_queue("[WARN] 페이지 상태 불안정 - TimeoutException 발생")
+            raise TimeoutException("페이지가 정상적으로 로드되지 않았습니다")
+        
         try:
             # 리스트 로드 대기
             self.wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, 'tbody.ant-table-tbody tr')))
@@ -1333,7 +1554,8 @@ class PoizonAutoBidderWorker:
             )
             self.log_to_queue("[OK] Create listings 완료")
         except TimeoutException:
-            raise Exception("Create listings 버튼을 찾을 수 없습니다")
+            # TimeoutException은 그대로 발생시켜 재시도 데코레이터가 처리하도록 함
+            raise TimeoutException("Create listings 버튼을 찾을 수 없습니다")
 
     def setup_regions(self):
         """Expand와 Select All만 처리 (탭 클릭 제거)"""
@@ -1916,44 +2138,68 @@ class PoizonAutoBidderWorker:
                             time.sleep(0.5)  # Remove 후 추가 대기
                         break  # Asia 체크 처리 후 while 루프 종료
                     
-                    # Asia 체크가 안 되어 있으면 다운 버튼 클릭
+                    # Asia 체크가 안 되어 있으면 무조건 다운 버튼 클릭 시도
                     self.log_to_queue(f"[INFO] Asia 체크 안 됨 - 다운 버튼 클릭 시도")
                     
-                    # 할인율 적용한 목표가 계산
-                    target_price = self.apply_custom_discount(cost)
+                    # Asia 체크를 위한 다운 버튼 클릭 루프 (최대 10회)
+                    max_asia_attempts = 10
+                    asia_attempt = 0
                     
-                    # 현재 가격이 목표가보다 높을 때만 다운 버튼 클릭
-                    if current_price > target_price:
-                        self.log_to_queue(f"[INFO] 현재가({current_price:,}) > 목표가({target_price:,}) - 다운 버튼 클릭")
-                        if not self.click_down_button(row):
-                            consecutive_fails += 1
-                            self.log_to_queue(f"[INFO] 가격 조정 실패 (연속 {consecutive_fails}회)")
-                            
-                            # 연속 3회 실패 시 Remove
-                            if consecutive_fails >= 3:
-                                self.log_to_queue(f"[INFO] 연속 실패로 인한 Remove")
-                                self.log_fail(idx, brand_name, code, color, size, cost, '가격 조정 불가 Remove')
-                                self.click_remove(row)
-                                break
-                            
-                            # 잠시 대기 후 재시도
-                            time.sleep(2)
-                        else:
-                            consecutive_fails = 0  # 성공 시 카운터 리셋
-                    else:
-                        # 현재 가격이 이미 목표가 이하인 경우
-                        self.log_to_queue(f"[INFO] 현재가({current_price:,}) <= 목표가({target_price:,}) - 추가 조정 불필요")
+                    while asia_attempt < max_asia_attempts:
+                        asia_attempt += 1
+                        self.log_to_queue(f"[ATTEMPT] Asia 체크 시도 {asia_attempt}/{max_asia_attempts}")
                         
-                        # 예상수익 재확인
-                        if est_payout >= cost and profit >= self.min_profit:
-                            self.log_to_queue(f"[OK] 입찰조건 충족: {matched_text} (수익: {profit}원)")
-                            successful.append(match_info)
-                            all_failed = False
-                        else:
-                            self.log_to_queue(f"[INFO] 예상수익 부족 - Remove")
-                            self.log_fail(idx, brand_name, code, color, size, cost, f'예상수익 부족 {profit}')
+                        # 다운 버튼 클릭 시도
+                        if not self.click_down_button(row):
+                            self.log_to_queue(f"[WARN] 다운 버튼 비활성화 - Asia 체크 불가")
+                            self.log_fail(idx, brand_name, code, color, size, cost, 'Asia체크불가-다운버튼비활성')
                             self.click_remove(row)
-                        break  # while 루프 종료
+                            break
+                        
+                        # 다운 버튼 클릭 후 대기
+                        time.sleep(0.5)
+                        
+                        # Asia 체크 상태 재확인
+                        asia_checked = self.is_asia_checked(row)
+                        
+                        if asia_checked:
+                            self.log_to_queue(f"[SUCCESS] Asia 체크 성공! (시도: {asia_attempt}회)")
+                            
+                            # Asia 체크 성공 후 정보 재추출
+                            est_payout = self.find_est_payout(row)
+                            profit = est_payout - cost
+                            
+                            # 수익 조건 확인
+                            if est_payout >= cost and profit >= self.min_profit:
+                                self.log_to_queue(f"[OK] 입찰조건 충족: {matched_text} (수익: {profit}원)")
+                                successful.append(match_info)
+                                bid_success = True
+                                all_failed = False
+                            else:
+                                self.log_to_queue(f"[INFO] Asia 체크 후 수익 조건 미충족 - Remove")
+                                self.log_fail(idx, brand_name, code, color, size, cost, f'Asia체크후수익미달 {profit}')
+                                self.click_remove(row)
+                            break  # Asia 체크 루프 종료
+                        
+                        # 현재 가격 확인 (디버깅)
+                        try:
+                            current_price_input = row.find_element(
+                                By.CSS_SELECTOR, 
+                                "td.inputNumberV2___dIR0i input[value]"
+                            )
+                            new_price = self.get_int(current_price_input.get_attribute("value"))
+                            self.log_to_queue(f"[DEBUG] 가격 변화: {current_price} → {new_price}")
+                            current_price = new_price
+                        except:
+                            pass
+                    
+                    # 최대 시도 횟수 초과
+                    if asia_attempt >= max_asia_attempts and not asia_checked:
+                        self.log_to_queue(f"[FAIL] Asia 체크 실패 - 최대 시도 횟수 초과")
+                        self.log_fail(idx, brand_name, code, color, size, cost, 'Asia체크실패-최대시도초과')
+                        self.click_remove(row)
+                    
+                    break  # while 루프 종료
                         
                 except StaleElementReferenceException:
                     retry_count += 1
