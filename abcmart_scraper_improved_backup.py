@@ -2,7 +2,6 @@ import time
 import re
 import json
 import os
-import undetected_chromedriver as uc
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -14,6 +13,7 @@ from multiprocessing import Process, Queue, Manager
 from scraper_logger import ScraperLogger
 from pathlib import Path
 import sys
+from chrome_driver_manager import initialize_chrome_driver
 
 def close_abcmart_popup(driver, worker_id=None):
     """
@@ -38,138 +38,37 @@ class AbcmartWorker:
         self.wait = None
         
     def setup_driver(self):
-        """Chrome 드라이버 설정 (개선된 충돌 방지)"""
-        max_retries = 3  # 재시도 횟수 줄임
-        retry_delay = 0.2  # 재시도 지연 더 단축
+        """Chrome 드라이버 설정 (chrome_driver_manager 사용)"""
+        max_retries = 3
+        retry_delay = 0.2
         
         for attempt in range(max_retries):
             try:
                 print(f"[Worker {self.worker_id}] Chrome 드라이버 초기화 중... (시도 {attempt + 1}/{max_retries})")
                 
-                options = uc.ChromeOptions()
-                
-                # 기본 설정
-                if self.headless:  # 모든 워커 헤드리스로
-                    options.add_argument('--headless')
-                
-                options.add_argument('--start-maximized')
-                options.add_argument('--no-sandbox')
-                options.add_argument('--disable-dev-shm-usage')
-                options.add_argument('--disable-gpu')
-                options.add_argument('--log-level=3')
-                options.add_argument('--disable-blink-features=AutomationControlled')
-                
-                # User-Agent 설정
-                options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36")
-                
-                # 리소스 차단 설정 (속도 최적화)
-                options.add_argument('--blink-settings=imagesEnabled=false')  # 이미지 차단
-                options.add_experimental_option("prefs", {
-                    "profile.default_content_setting_values": {
-                        "images": 2,  # 이미지 차단
-                        "plugins": 2,  # 플러그인 차단
-                        "popups": 2,  # 팝업 차단
-                        "geolocation": 2,  # 위치 차단
-                        "notifications": 2,  # 알림 차단
-                        "media_stream": 2,  # 미디어 차단
-                        "javascript": 1  # JS는 켜두기 (필수)
-                    },
-                    "profile.managed_default_content_settings": {
-                        "images": 2,
-                        # "stylesheet": 2  # CSS는 레이아웃 문제로 주석 처리
-                    }
-                })
-                
-                # 추가 성능 최적화 옵션
-                options.add_argument('--disable-web-security')
-                options.add_argument('--disable-features=VizDisplayCompositor')
-                options.add_argument('--disable-dev-tools')
-                options.add_argument('--disable-extensions')
-                options.add_argument('--disable-default-apps')
-                options.add_argument('--disable-sync')
-                options.add_argument('--disable-translate')
-                options.add_argument('--metrics-recording-only')
-                options.add_argument('--no-first-run')
-                options.add_argument('--safebrowsing-disable-auto-update')
-                options.add_argument('--disable-background-networking')
-                
-                # 페이지 로드 전략 설정 (DOM 로드 완료시 즉시 진행)
-                options.page_load_strategy = 'eager'
-                
-                # 각 워커별로 고유한 설정
-                import tempfile
-                import os
-                import shutil
-                import glob
-                
-                # 워커별 고유 사용자 데이터 디렉토리
-                user_data_dir = os.path.join(tempfile.gettempdir(), f'chrome_worker_{self.worker_id}_{os.getpid()}')
-                if os.path.exists(user_data_dir):
-                    shutil.rmtree(user_data_dir, ignore_errors=True)
-                os.makedirs(user_data_dir, exist_ok=True)
-                options.add_argument(f'--user-data-dir={user_data_dir}')
-                
-                # 워커별 고유 포트 설정 (충돌 방지)
-                port = 9222 + self.worker_id
-                options.add_argument(f'--remote-debugging-port={port}')
-                
-                # undetected_chromedriver의 chromedriver 경로 찾기
-                uc_paths = [
-                    os.path.join(os.environ.get('APPDATA', ''), 'undetected_chromedriver', 'undetected_chromedriver.exe'),
-                    os.path.join(os.environ.get('LOCALAPPDATA', ''), 'undetected_chromedriver', 'chromedriver.exe'),
-                    os.path.join(os.path.expanduser('~'), '.undetected_chromedriver', 'chromedriver.exe'),
-                ]
-                
-                # 가능한 모든 경로에서 chromedriver 찾기
-                existing_driver = None
-                for path in uc_paths:
-                    if os.path.exists(path):
-                        existing_driver = path
-                        break
-                
-                # 기존 chromedriver를 찾았으면 워커별 복사본 생성
-                if existing_driver:
-                    driver_dir = os.path.join(tempfile.gettempdir(), f'chromedriver_worker_{self.worker_id}_{os.getpid()}')
-                    os.makedirs(driver_dir, exist_ok=True)
-                    driver_path = os.path.join(driver_dir, 'chromedriver.exe')
-                    
-                    try:
-                        shutil.copy2(existing_driver, driver_path)
-                        print(f"[Worker {self.worker_id}] chromedriver 복사 완료")
-                        
-                        # 워커별 개별 chromedriver로 실행
-                        self.driver = uc.Chrome(
-                            options=options, 
-                            driver_executable_path=driver_path,
-                            version_main=None,
-                            use_subprocess=False  # 서브프로세스 사용 안함
-                        )
-                    except:
-                        # 복사 실패시 기본 방식 사용
-                        self.driver = uc.Chrome(options=options, version_main=None)
-                else:
-                    # chromedriver를 찾지 못했으면 기본 방식 사용
-                    print(f"[Worker {self.worker_id}] 기존 chromedriver 없음, 자동 다운로드...")
-                    self.driver = uc.Chrome(options=options, version_main=None)
+                # chrome_driver_manager의 initialize_chrome_driver 사용
+                self.driver = initialize_chrome_driver(
+                    worker_id=self.worker_id,
+                    headless=self.headless,
+                    use_undetected=True,  # undetected_chromedriver 사용
+                    extra_options=[
+                        '--blink-settings=imagesEnabled=false',  # 이미지 차단
+                        '--page-load-strategy=eager'  # DOM 로드 완료시 즉시 진행
+                    ]
+                )
                 
                 self.wait = WebDriverWait(self.driver, 10)
                 
                 print(f"[Worker {self.worker_id}] ✅ Chrome 드라이버 설정 완료!")
                 return  # 성공시 함수 종료
                 
-            except (FileExistsError, PermissionError, OSError) as e:
-                print(f"[Worker {self.worker_id}] Chrome 드라이버 초기화 충돌 발생: {e}")
+            except Exception as e:
+                print(f"[Worker {self.worker_id}] Chrome 드라이버 설정 실패: {e}")
                 if attempt < max_retries - 1:
                     print(f"[Worker {self.worker_id}] {retry_delay}초 후 재시도...")
                     time.sleep(retry_delay + (self.worker_id * 0.1))  # 워커별 미세한 차이
                 else:
                     print(f"[Worker {self.worker_id}] Chrome 드라이버 설정 최종 실패")
-                    raise
-            except Exception as e:
-                print(f"[Worker {self.worker_id}] Chrome 드라이버 설정 실패: {e}")
-                if attempt < max_retries - 1:
-                    time.sleep(retry_delay)
-                else:
                     raise
     
     def extract_brand(self):
