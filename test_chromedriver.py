@@ -1,27 +1,21 @@
 #!/usr/bin/env python3
 """
-ChromeDriver 작동 테스트
+ChromeDriver 작동 테스트 - chrome_driver_manager 사용
 """
 
 import time
 from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
-from webdriver_manager.chrome import ChromeDriverManager
+from chrome_driver_manager import initialize_chrome_driver
 
 print("ChromeDriver 테스트 시작...")
 
 try:
-    # Chrome 옵션 설정
-    chrome_options = webdriver.ChromeOptions()
-    chrome_options.add_argument('--no-sandbox')
-    chrome_options.add_argument('--disable-dev-shm-usage')
-    chrome_options.add_argument('--window-size=1280,720')
-    
-    # webdriver-manager를 사용하여 드라이버 초기화
+    # chrome_driver_manager를 사용하여 드라이버 초기화
     print("ChromeDriver 초기화 중...")
-    driver = webdriver.Chrome(
-        service=Service(ChromeDriverManager().install()), 
-        options=chrome_options
+    driver = initialize_chrome_driver(
+        headless=False,  # 테스트이므로 화면 표시
+        use_undetected=False,  # 일반 모드로 테스트
+        extra_options=['--window-size=1280,720']
     )
     
     print("ChromeDriver 초기화 성공!")

@@ -4,20 +4,18 @@
 import time
 from selenium import webdriver
 from selenium.webdriver.common.by import By
-import undetected_chromedriver as uc
+from chrome_driver_manager import initialize_chrome_driver
 
 def test_abcmart_search():
     """ABC마트 검색 테스트"""
     print("ABC마트 검색 테스트 시작...")
     
     # 드라이버 설정
-    options = uc.ChromeOptions()
-    options.add_argument("--no-sandbox")
-    options.add_argument("--disable-dev-shm-usage")
-    options.add_argument("--disable-gpu")
-    options.add_argument("--window-size=1920,1080")
-    
-    driver = uc.Chrome(options=options, version_main=None)
+    driver = initialize_chrome_driver(
+        headless=False,  # 테스트이므로 화면 표시
+        use_undetected=True,
+        extra_options=["--window-size=1920,1080"]
+    )
     
     try:
         # 검색 URL
