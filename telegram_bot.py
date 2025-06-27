@@ -936,9 +936,7 @@ class BiddingBot:
                     strategy='basic',
                     status_callback=status_callback,
                     custom_discount_rate=custom_discount_rate,
-                    custom_min_profit=custom_min_profit,
-                    points_rate=points_rate,
-                    card_discount=card_discount
+                    custom_min_profit=custom_min_profit
                 )
                 
                 # 작업 완료 후 잠시 대기 (마지막 메시지 처리)
