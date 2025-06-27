@@ -17,10 +17,10 @@ try:
     from selenium.webdriver.common.by import By
     from selenium.webdriver.support.ui import WebDriverWait
     from selenium.webdriver.support import expected_conditions as EC
-    import undetected_chromedriver as uc
+    from chrome_driver_manager import initialize_chrome_driver
 except ImportError:
     print("Selenium이 설치되지 않았습니다.")
-    print("pip install selenium undetected-chromedriver")
+    print("pip install selenium")
     exit(1)
 
 logger = logging.getLogger(__name__)
@@ -76,33 +76,19 @@ class LoginManager:
     
     def init_driver(self, headless: bool = False) -> webdriver.Chrome:
         """드라이버 초기화"""
-        options = uc.ChromeOptions()
-        options.add_argument("--no-sandbox")
-        options.add_argument("--disable-dev-shm-usage")
-        options.add_argument("--disable-gpu")
-        options.add_argument("--window-size=1920,1080")
-        
-        # Chrome 바이너리 경로 명시적 설정
-        chrome_paths = [
-            r"C:\Program Files\Google\Chrome\Application\chrome.exe",
-            r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
-            os.path.expandvars(r"%LOCALAPPDATA%\Google\Chrome\Application\chrome.exe"),
-        ]
-        
-        chrome_binary = None
-        for path in chrome_paths:
-            if os.path.exists(path):
-                chrome_binary = path
-                break
-        
-        if chrome_binary:
-            options.binary_location = chrome_binary
-        
-        if headless:
-            options.add_argument("--headless")
-        
-        self.driver = uc.Chrome(options=options, version_main=None)
-        return self.driver
+        try:
+            # chrome_driver_manager를 사용하여 Chrome 드라이버 초기화
+            self.driver = initialize_chrome_driver(
+                headless=headless,
+                use_undetected=True,  # undetected_chromedriver 사용
+                extra_options=[
+                    "--window-size=1920,1080"
+                ]
+            )
+            return self.driver
+        except Exception as e:
+            logger.error(f"Chrome 드라이버 초기화 실패: {e}")
+            raise
     
     def save_cookies(self):
         """현재 쿠키 저장"""
