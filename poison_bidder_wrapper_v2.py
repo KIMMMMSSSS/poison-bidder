@@ -24,6 +24,7 @@ from typing import List, Dict, Any, Optional, Tuple
 from login_manager import LoginManager
 from dotenv import load_dotenv
 from musinsa_scraper_improved import enhanced_close_musinsa_popup
+from chrome_driver_manager import initialize_chrome_driver
 
 # Selenium imports
 from selenium import webdriver
@@ -264,15 +265,21 @@ def worker_process_wrapper(worker_id, task_queue, result_queue, status_dict, log
             chrome_options.add_experimental_option('excludeSwitches', ['enable-logging'])
             chrome_options.add_experimental_option('useAutomationExtension', False)
             
-            # Chrome 드라이버 초기화
+            # Chrome 드라이버 초기화 (chrome_driver_manager 사용)
             try:
-                # webdriver-manager를 사용하여 자동으로 드라이버 관리
-                from webdriver_manager.chrome import ChromeDriverManager
-                bidder.driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
-            except Exception as fallback_error:
-                # fallback: 기존 방식 시도
-                result_queue.put(("LOG", f"[Worker {worker_id}] webdriver-manager 실패, 기존 방식 시도..."))
-                bidder.driver = webdriver.Chrome(service=Service(driver_path), options=chrome_options)
+                # chrome_driver_manager.initialize_chrome_driver() 사용
+                bidder.driver = initialize_chrome_driver(options=chrome_options)
+                result_queue.put(("LOG", f"[Worker {worker_id}] Chrome 드라이버 초기화 성공 (chrome_driver_manager 사용)"))
+            except Exception as e:
+                # fallback: webdriver-manager 직접 사용
+                try:
+                    from webdriver_manager.chrome import ChromeDriverManager
+                    bidder.driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
+                    result_queue.put(("LOG", f"[Worker {worker_id}] Chrome 드라이버 초기화 성공 (webdriver-manager 직접 사용)"))
+                except Exception as fallback_error:
+                    # 최종 fallback: 기존 driver_path 사용
+                    result_queue.put(("LOG", f"[Worker {worker_id}] chrome_driver_manager 실패, 기존 방식 시도..."))
+                    bidder.driver = webdriver.Chrome(service=Service(driver_path), options=chrome_options)
             
             bidder.wait = WebDriverWait(bidder.driver, DEFAULT_WAIT_TIME)
             
