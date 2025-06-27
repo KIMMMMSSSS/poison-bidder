@@ -26,7 +26,7 @@ try:
     from selenium.webdriver.common.by import By
     from selenium.webdriver.support.ui import WebDriverWait
     from selenium.webdriver.support import expected_conditions as EC
-    import undetected_chromedriver as uc
+    from chrome_driver_manager import initialize_chrome_driver
     SELENIUM_AVAILABLE = True
 except ImportError:
     SELENIUM_AVAILABLE = False
@@ -642,28 +642,15 @@ class AutoBidding:
             
             # 드라이버가 없으면 일반 모드로 초기화
             if not self.driver:
-                options = uc.ChromeOptions()
-                options.add_argument("--no-sandbox")
-                options.add_argument("--disable-dev-shm-usage")
-                options.add_argument("--disable-gpu")
-                options.add_argument("--window-size=1920,1080")
-                
-                # Chrome 바이너리 경로 찾기
-                chrome_paths = [
-                    r"C:\Program Files\Google\Chrome\Application\chrome.exe",
-                    r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
-                    os.path.expandvars(r"%LOCALAPPDATA%\Google\Chrome\Application\chrome.exe"),
-                    os.path.expandvars(r"%PROGRAMFILES%\Google\Chrome\Application\chrome.exe"),
-                    os.path.expandvars(r"%PROGRAMFILES(X86)%\Google\Chrome\Application\chrome.exe")
-                ]
-                
-                for chrome_path in chrome_paths:
-                    if os.path.exists(chrome_path):
-                        options.binary_location = chrome_path
-                        break
-                
                 try:
-                    self.driver = uc.Chrome(options=options, version_main=None)
+                    # chrome_driver_manager를 사용하여 Chrome 드라이버 초기화
+                    self.driver = initialize_chrome_driver(
+                        headless=False,  # 일반 모드 (헤드리스 아님)
+                        use_undetected=True,  # undetected_chromedriver 사용
+                        extra_options=[
+                            "--window-size=1920,1080"
+                        ]
+                    )
                 except Exception as e:
                     logger.error(f"Chrome 드라이버 초기화 실패: {e}")
                     return []
