@@ -9,6 +9,7 @@ python-dotenv==1.0.0
 # 자동화 기능을 위한 추가 패키지
 selenium==4.16.0
 undetected-chromedriver==3.5.4
+webdriver-manager>=4.0.0
 
 # 선택사항 (성능 향상)
 # aiofiles==23.2.1
