@@ -641,6 +641,7 @@ class AutoBidding:
                     )
             
             # 드라이버가 없으면 일반 모드로 초기화
+            driver_created_here = False  # 이 메서드에서 드라이버를 생성했는지 추적
             if not self.driver:
                 try:
                     # chrome_driver_manager를 사용하여 Chrome 드라이버 초기화
@@ -651,6 +652,7 @@ class AutoBidding:
                             "--window-size=1920,1080"
                         ]
                     )
+                    driver_created_here = True  # 여기서 생성됨을 표시
                 except Exception as e:
                     logger.error(f"Chrome 드라이버 초기화 실패: {e}")
                     return []
@@ -897,6 +899,13 @@ class AutoBidding:
             
         except Exception as e:
             logger.error(f"링크 추출 오류: {e}")
+            # 오류 발생 시에도 드라이버 종료
+            if 'driver_created_here' in locals() and driver_created_here and self.driver:
+                try:
+                    self.driver.quit()
+                    self.driver = None
+                except:
+                    pass
         
         # 최종 중복 제거 및 통계
         final_links_before = len(links)
@@ -910,6 +919,15 @@ class AutoBidding:
             logger.info(f"- 중복 제거: {final_duplicates}개")
         logger.info(f"- 최종 고유 링크: {len(final_links)}개")
         logger.info(f"- 키워드: '{keyword}'")
+        
+        # ABC마트의 경우 이 메서드에서 생성한 드라이버는 즉시 종료
+        if site == 'abcmart' and driver_created_here and self.driver:
+            try:
+                logger.info("ABC마트 링크 추출 완료, 드라이버 종료")
+                self.driver.quit()
+                self.driver = None
+            except Exception as e:
+                logger.error(f"드라이버 종료 중 오류: {e}")
         
         return final_links
     
