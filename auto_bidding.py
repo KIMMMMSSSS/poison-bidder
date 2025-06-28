@@ -645,14 +645,27 @@ class AutoBidding:
             if not self.driver:
                 try:
                     # chrome_driver_manager를 사용하여 Chrome 드라이버 초기화
+                    # ABC마트는 헤드리스 모드로 실행 (창이 안 뜸)
+                    headless_mode = (site == 'abcmart')
                     self.driver = initialize_chrome_driver(
-                        headless=False,  # 일반 모드 (헤드리스 아님)
+                        headless=headless_mode,  # ABC마트는 헤드리스 모드
                         use_undetected=True,  # undetected_chromedriver 사용
                         extra_options=[
-                            "--window-size=1920,1080"
+                            "--window-size=1920,1080",
+                            "--page-load-strategy=eager",  # DOM 로드되면 즉시 진행
+                            "--disable-blink-features=AutomationControlled",
+                            "--disable-features=NetworkService",
+                            "--disable-features=VizDisplayCompositor",
+                            "--force-device-scale-factor=1"
                         ]
                     )
                     driver_created_here = True  # 여기서 생성됨을 표시
+                    
+                    # 페이지 로드 타임아웃 설정
+                    self.driver.set_page_load_timeout(30)  # 30초 타임아웃
+                    
+                    if headless_mode:
+                        logger.info("ABC마트 헤드리스 모드로 실행 (창 없음)")
                 except Exception as e:
                     logger.error(f"Chrome 드라이버 초기화 실패: {e}")
                     return []
@@ -688,9 +701,18 @@ class AutoBidding:
                         # 채널별 URL 생성
                         page_url = self._build_channel_search_url(keyword, channel_info, page)
                         
-                        # 페이지 로드
-                        self.driver.get(page_url)
-                        time.sleep(page_wait_time)
+                        # 페이지 로드 (타임아웃 처리 추가)
+                        try:
+                            self.driver.get(page_url)
+                            time.sleep(page_wait_time)
+                        except Exception as e:
+                            logger.warning(f"[{channel_info['name']}] 페이지 {page} 로드 타임아웃 또는 오류: {e}")
+                            # 타임아웃이나 오류 발생 시에도 계속 진행
+                            try:
+                                # 현재 페이지에서 가능한 만큼 추출 시도
+                                page_links_new = self._extract_links_from_page(site, channel_info)
+                            except:
+                                page_links_new = []
                         
                         # 링크 추출
                         page_links_new = self._extract_links_from_page(site, channel_info)
