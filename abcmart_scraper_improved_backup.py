@@ -50,10 +50,12 @@ class AbcmartWorker:
                 self.driver = initialize_chrome_driver(
                     worker_id=self.worker_id,
                     headless=self.headless,
-                    use_undetected=True,  # undetected_chromedriver 사용
+                    use_undetected=False,  # ABC마트는 일반 selenium 사용
                     extra_options=[
                         '--blink-settings=imagesEnabled=false',  # 이미지 차단
-                        '--page-load-strategy=eager'  # DOM 로드 완료시 즉시 진행
+                        '--page-load-strategy=eager',  # DOM 로드 완료시 즉시 진행
+                        '--no-sandbox',
+                        '--disable-dev-shm-usage'
                     ]
                 )
                 

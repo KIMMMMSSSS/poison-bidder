@@ -377,6 +377,13 @@ def initialize_chrome_driver(worker_id: int = 1, headless: bool = True, use_unde
                 for option in extra_options:
                     options.add_argument(option)
             
+            # 격리된 프로필 사용 (기존 Chrome과 충돌 방지)
+            import tempfile
+            temp_profile = tempfile.mkdtemp(prefix="chrome_profile_")
+            options.add_argument(f'--user-data-dir={temp_profile}')
+            options.add_argument('--no-first-run')
+            options.add_argument('--no-default-browser-check')
+            
             # Chrome 버전 확인하여 메이저 버전 전달
             chrome_version = manager.get_chrome_version()
             if chrome_version:
@@ -396,14 +403,16 @@ def initialize_chrome_driver(worker_id: int = 1, headless: bool = True, use_unde
                     options=options, 
                     version_main=major_version,
                     suppress_welcome=True,  # 환영 화면 억제
-                    use_subprocess=True     # 서브프로세스 사용
+                    use_subprocess=True,     # 서브프로세스 사용
+                    driver_executable_path=driver_path  # 명시적 드라이버 경로
                 )
             else:
                 driver = uc.Chrome(
                     options=options, 
                     version_main=None,
                     suppress_welcome=True,
-                    use_subprocess=True
+                    use_subprocess=True,
+                    driver_executable_path=driver_path
                 )
             
             logger.info(f"[Worker {worker_id}] undetected-chromedriver 초기화 성공")
