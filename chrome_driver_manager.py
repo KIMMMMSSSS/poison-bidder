@@ -312,7 +312,7 @@ def get_chrome_version() -> Optional[str]:
     return manager.get_chrome_version()
 
 
-def initialize_chrome_driver(worker_id: int = 1, headless: bool = True):
+def initialize_chrome_driver(worker_id: int = 1, headless: bool = True, use_undetected: bool = True, extra_options: list = None):
     """
     Chrome 드라이버 초기화 헬퍼 함수
     poison_bidder_wrapper_v2.py에서 쉽게 사용할 수 있도록 제공
@@ -320,6 +320,8 @@ def initialize_chrome_driver(worker_id: int = 1, headless: bool = True):
     Args:
         worker_id: 워커 ID (로깅용)
         headless: 헤드리스 모드 여부
+        use_undetected: undetected-chromedriver 사용 여부 (기본값: True)
+        extra_options: 추가 Chrome 옵션 리스트 (선택사항)
         
     Returns:
         driver: 초기화된 Chrome 드라이버 객체
@@ -331,34 +333,40 @@ def initialize_chrome_driver(worker_id: int = 1, headless: bool = True):
         raise Exception("ChromeDriver 초기화 실패")
         
     # undetected-chromedriver 우선 사용
-    try:
-        import undetected_chromedriver as uc
-        
-        options = uc.ChromeOptions()
-        if headless:
-            options.add_argument('--headless')
-        options.add_argument('--no-sandbox')
-        options.add_argument('--disable-dev-shm-usage')
-        options.add_argument('--window-size=1920,1080')
-        
-        # 메모리 최적화 옵션들
-        options.add_argument('--disable-logging')
-        options.add_argument('--log-level=3')
-        options.add_argument('--silent')
-        options.add_argument('--disable-gpu')
-        options.add_argument('--disable-software-rasterizer')
-        options.add_argument('--disable-background-timer-throttling')
-        options.add_argument('--disable-backgrounding-occluded-windows')
-        options.add_argument('--disable-renderer-backgrounding')
-        options.add_argument('--disable-features=TranslateUI')
-        options.add_argument('--disable-ipc-flooding-protection')
-        
-        driver = uc.Chrome(options=options, version_main=None)
-        logger.info(f"[Worker {worker_id}] undetected-chromedriver 초기화 성공")
-        return driver
-        
-    except Exception as e:
-        logger.warning(f"[Worker {worker_id}] undetected-chromedriver 실패: {e}")
+    if use_undetected:
+        try:
+            import undetected_chromedriver as uc
+            
+            options = uc.ChromeOptions()
+            if headless:
+                options.add_argument('--headless')
+            options.add_argument('--no-sandbox')
+            options.add_argument('--disable-dev-shm-usage')
+            options.add_argument('--window-size=1920,1080')
+            
+            # 메모리 최적화 옵션들
+            options.add_argument('--disable-logging')
+            options.add_argument('--log-level=3')
+            options.add_argument('--silent')
+            options.add_argument('--disable-gpu')
+            options.add_argument('--disable-software-rasterizer')
+            options.add_argument('--disable-background-timer-throttling')
+            options.add_argument('--disable-backgrounding-occluded-windows')
+            options.add_argument('--disable-renderer-backgrounding')
+            options.add_argument('--disable-features=TranslateUI')
+            options.add_argument('--disable-ipc-flooding-protection')
+            
+            # 추가 옵션 적용
+            if extra_options:
+                for option in extra_options:
+                    options.add_argument(option)
+            
+            driver = uc.Chrome(options=options, version_main=None)
+            logger.info(f"[Worker {worker_id}] undetected-chromedriver 초기화 성공")
+            return driver
+            
+        except Exception as e:
+            logger.warning(f"[Worker {worker_id}] undetected-chromedriver 실패: {e}")
         
         # fallback to selenium
         from selenium import webdriver
@@ -375,6 +383,11 @@ def initialize_chrome_driver(worker_id: int = 1, headless: bool = True):
         options.add_argument('--disable-logging')
         options.add_argument('--log-level=3')
         options.add_argument('--disable-gpu')
+        
+        # 추가 옵션 적용
+        if extra_options:
+            for option in extra_options:
+                options.add_argument(option)
         
         service = Service(driver_path)
         driver = webdriver.Chrome(service=service, options=options)
