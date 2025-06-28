@@ -503,17 +503,20 @@ class BiddingBot:
             settings_msg += f"💵 최소 수익: {min_profit:,}원\n\n"
             settings_msg += f"이대로 진행하시겠습니까?"
             
-            # callback_data에 설정값 포함 (적립금과 카드 할인 정보 추가)
-            callback_data_parts = [
-                "auto_start_with_discounts",
-                site,
-                '|'.join(keywords),
-                str(discount_rate),
-                str(min_profit),
-                str(context.user_data.get('points_rate', 0)),
-                '1' if context.user_data.get('use_card_discount', False) else '0'
-            ]
-            callback_data = "_".join(callback_data_parts)
+            # callback_data를 짧게 유지하고 실제 데이터는 context에 저장
+            # callback_data 최대 64바이트 제한 때문에 간단하게 구성
+            callback_data = "auto_start_confirm"
+            
+            # 모든 설정을 context.user_data에 저장
+            context.user_data['final_settings'] = {
+                'site': site,
+                'keywords': keywords,
+                'discount_rate': discount_rate,
+                'min_profit': min_profit,
+                'points_rate': context.user_data.get('points_rate', 0),
+                'use_card_discount': context.user_data.get('use_card_discount', False),
+                'card_discount': context.user_data.get('card_discount', None)
+            }
             
             keyboard = [
                 [
@@ -699,6 +702,29 @@ class BiddingBot:
             
             # 비동기로 입찰 실행
             asyncio.create_task(self._run_bidding(query, site, strategy))
+            
+        elif data == "auto_start_confirm":
+            # context.user_data에서 저장된 설정 가져오기
+            final_settings = context.user_data.get('final_settings', {})
+            
+            if final_settings:
+                site = final_settings.get('site', 'musinsa')
+                keywords = final_settings.get('keywords', [])
+                custom_discount_rate = final_settings.get('discount_rate')
+                custom_min_profit = final_settings.get('min_profit')
+                points_rate = final_settings.get('points_rate', 0) if final_settings.get('points_rate', 0) > 0 else None
+                card_discount = final_settings.get('card_discount') if final_settings.get('use_card_discount') else None
+                
+                await query.edit_message_text("🤖 자동화 입찰을 시작합니다...")
+                
+                # 비동기로 자동 입찰 실행
+                asyncio.create_task(self._run_auto_bidding(
+                    query, site, keywords, 
+                    custom_discount_rate, custom_min_profit,
+                    points_rate, card_discount
+                ))
+            else:
+                await query.edit_message_text("❌ 설정을 찾을 수 없습니다. 다시 시도해주세요.")
             
         elif data.startswith("auto_start_"):
             # 자동화 입찰 시작
