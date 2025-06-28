@@ -647,17 +647,24 @@ class AutoBidding:
                     # chrome_driver_manager를 사용하여 Chrome 드라이버 초기화
                     # ABC마트는 헤드리스 모드로 실행 (창이 안 뜸)
                     headless_mode = (site == 'abcmart')
+                    use_undetected = (site != 'abcmart')  # ABC마트는 일반 selenium 사용
+                    
+                    extra_opts = [
+                        "--window-size=1920,1080",
+                        "--page-load-strategy=eager",  # DOM 로드되면 즉시 진행
+                        "--disable-blink-features=AutomationControlled",
+                        "--disable-features=NetworkService",
+                        "--disable-features=VizDisplayCompositor",
+                        "--force-device-scale-factor=1"
+                    ]
+                    
+                    if site == 'abcmart':
+                        extra_opts.append("--force-regular-selenium")  # 일반 selenium 강제
+                    
                     self.driver = initialize_chrome_driver(
                         headless=headless_mode,  # ABC마트는 헤드리스 모드
-                        use_undetected=True,  # undetected_chromedriver 사용
-                        extra_options=[
-                            "--window-size=1920,1080",
-                            "--page-load-strategy=eager",  # DOM 로드되면 즉시 진행
-                            "--disable-blink-features=AutomationControlled",
-                            "--disable-features=NetworkService",
-                            "--disable-features=VizDisplayCompositor",
-                            "--force-device-scale-factor=1"
-                        ]
+                        use_undetected=use_undetected,  # ABC마트는 False
+                        extra_options=extra_opts
                     )
                     driver_created_here = True  # 여기서 생성됨을 표시
                     

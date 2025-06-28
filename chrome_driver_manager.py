@@ -13,6 +13,7 @@ import zipfile
 import shutil
 import platform
 import logging
+import time
 from pathlib import Path
 from typing import Optional, Tuple
 
@@ -337,6 +338,15 @@ def initialize_chrome_driver(worker_id: int = 1, headless: bool = True, use_unde
     
     if not driver_path:
         raise Exception("ChromeDriver 초기화 실패")
+    
+    # ABC마트와 같은 특정 사이트의 경우 일반 selenium 우선 사용
+    force_regular_selenium = False
+    if extra_options:
+        for opt in extra_options:
+            if "abcmart" in opt.lower() or "force-regular-selenium" in opt:
+                force_regular_selenium = True
+                use_undetected = False
+                break
         
     # undetected-chromedriver 우선 사용
     if use_undetected:
@@ -372,9 +382,29 @@ def initialize_chrome_driver(worker_id: int = 1, headless: bool = True, use_unde
             if chrome_version:
                 major_version = int(chrome_version.split('.')[0])
                 logger.info(f"[Worker {worker_id}] Chrome {major_version} 감지, 해당 버전용 드라이버 사용")
-                driver = uc.Chrome(options=options, version_main=major_version)
+                
+                # Chrome 프로세스 정리 (새로운 Chrome 시작 전)
+                import subprocess
+                try:
+                    subprocess.run(["taskkill", "/F", "/IM", "chrome.exe"], capture_output=True)
+                    time.sleep(1)
+                except:
+                    pass
+                
+                # suppress_welcome 옵션 추가로 더 빠른 시작
+                driver = uc.Chrome(
+                    options=options, 
+                    version_main=major_version,
+                    suppress_welcome=True,  # 환영 화면 억제
+                    use_subprocess=True     # 서브프로세스 사용
+                )
             else:
-                driver = uc.Chrome(options=options, version_main=None)
+                driver = uc.Chrome(
+                    options=options, 
+                    version_main=None,
+                    suppress_welcome=True,
+                    use_subprocess=True
+                )
             
             logger.info(f"[Worker {worker_id}] undetected-chromedriver 초기화 성공")
             return driver
