@@ -270,8 +270,14 @@ class ChromeDriverManager:
             options.add_argument('--no-sandbox')
             options.add_argument('--disable-dev-shm-usage')
             
-            # version_main=None으로 자동 버전 매칭
-            driver = uc.Chrome(options=options, version_main=None)
+            # version_main에 Chrome 메이저 버전 전달
+            chrome_version = self.get_chrome_version()
+            if chrome_version:
+                major_version = int(chrome_version.split('.')[0])
+                logger.info(f"Chrome {major_version} 감지, 해당 버전용 드라이버 사용")
+                driver = uc.Chrome(options=options, version_main=major_version)
+            else:
+                driver = uc.Chrome(options=options, version_main=None)
             driver.get("https://www.google.com")
             title = driver.title
             driver.quit()
@@ -361,7 +367,15 @@ def initialize_chrome_driver(worker_id: int = 1, headless: bool = True, use_unde
                 for option in extra_options:
                     options.add_argument(option)
             
-            driver = uc.Chrome(options=options, version_main=None)
+            # Chrome 버전 확인하여 메이저 버전 전달
+            chrome_version = manager.get_chrome_version()
+            if chrome_version:
+                major_version = int(chrome_version.split('.')[0])
+                logger.info(f"[Worker {worker_id}] Chrome {major_version} 감지, 해당 버전용 드라이버 사용")
+                driver = uc.Chrome(options=options, version_main=major_version)
+            else:
+                driver = uc.Chrome(options=options, version_main=None)
+            
             logger.info(f"[Worker {worker_id}] undetected-chromedriver 초기화 성공")
             return driver
             
