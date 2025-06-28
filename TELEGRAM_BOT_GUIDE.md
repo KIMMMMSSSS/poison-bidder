@@ -33,7 +33,23 @@ python telegram_bot.py
 - `/bid abcmart` - ABC마트 입찰
 - `/bid musinsa standard` - 무신사 standard 전략
 
+## 6. Chrome 138+ 호환성
+시스템은 Chrome 138 이상 버전과 자동으로 호환됩니다:
+- ChromeDriver가 자동으로 관리됨
+- 버전 불일치 시 자동 업데이트
+- 수동 개입 불필요
+
+Chrome 관련 문제 발생 시:
+```bash
+# Chrome 버전 확인
+python check_chrome_version.py
+
+# 캐시 정리
+python clean_uc_cache.py
+```
+
 ## 주의사항
 - admin_ids에 등록된 사용자만 봇 사용 가능
 - 한 번에 하나의 작업만 실행 가능
 - 입찰 전 input 폴더에 링크 파일 필요
+- Chrome이 자동 업데이트되어도 시스템이 자동 대응

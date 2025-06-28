@@ -306,6 +306,12 @@ class ChromeDriverManager:
                 return False
                 
 
+def get_chrome_version() -> Optional[str]:
+    """설치된 Chrome 브라우저 버전 확인 (헬퍼 함수)"""
+    manager = ChromeDriverManager()
+    return manager.get_chrome_version()
+
+
 def initialize_chrome_driver(worker_id: int = 1, headless: bool = True):
     """
     Chrome 드라이버 초기화 헬퍼 함수
