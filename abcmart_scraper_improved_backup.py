@@ -13,7 +13,7 @@ from multiprocessing import Process, Queue, Manager
 from scraper_logger import ScraperLogger
 from pathlib import Path
 import sys
-from chrome_driver_manager import initialize_chrome_driver
+from chrome_driver_manager import initialize_chrome_driver, ChromeDriverInitError
 
 def close_abcmart_popup(driver, worker_id=None):
     """
@@ -59,11 +59,29 @@ class AbcmartWorker:
                     ]
                 )
                 
+                # 드라이버가 None인지 명시적으로 확인
+                if self.driver is None:
+                    raise ChromeDriverInitError(f"[Worker {self.worker_id}] 드라이버가 None을 반환했습니다.")
+                
+                # set_page_load_timeout 테스트
+                try:
+                    self.driver.set_page_load_timeout(30)
+                except AttributeError as e:
+                    raise ChromeDriverInitError(f"[Worker {self.worker_id}] 드라이버가 유효하지 않습니다: {e}")
+                
                 self.wait = WebDriverWait(self.driver, 10)
                 
                 print(f"[Worker {self.worker_id}] ✅ Chrome 드라이버 설정 완료!")
                 return  # 성공시 함수 종료
                 
+            except ChromeDriverInitError as e:
+                print(f"[Worker {self.worker_id}] Chrome 드라이버 초기화 에러: {e}")
+                if attempt < max_retries - 1:
+                    print(f"[Worker {self.worker_id}] {retry_delay}초 후 재시도...")
+                    time.sleep(retry_delay + (self.worker_id * 0.1))
+                else:
+                    print(f"[Worker {self.worker_id}] Chrome 드라이버 설정 최종 실패")
+                    raise
             except Exception as e:
                 print(f"[Worker {self.worker_id}] Chrome 드라이버 설정 실패: {e}")
                 if attempt < max_retries - 1:
@@ -71,7 +89,7 @@ class AbcmartWorker:
                     time.sleep(retry_delay + (self.worker_id * 0.1))  # 워커별 미세한 차이
                 else:
                     print(f"[Worker {self.worker_id}] Chrome 드라이버 설정 최종 실패")
-                    raise
+                    raise ChromeDriverInitError(f"[Worker {self.worker_id}] 모든 시도 실패: {e}")
     
     def extract_brand(self):
         """브랜드 추출"""
@@ -813,7 +831,12 @@ class AbcmartMultiprocessScraper:
             # 최종 결과 저장
             print(f"\n총 {len(products_data)}개 상품 스크래핑 완료!")
             print(f"소요 시간: {total_duration/60:.1f}분")
-            print(f"평균 처리 시간: {total_duration/len(urls):.1f}초/URL")
+            
+            # 평균 처리 시간 계산 (0으로 나누기 방지)
+            if len(urls) > 0:
+                print(f"평균 처리 시간: {total_duration/len(urls):.1f}초/URL")
+            else:
+                print("처리할 URL이 없습니다.")
             
             # JSON 파일로 저장
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
