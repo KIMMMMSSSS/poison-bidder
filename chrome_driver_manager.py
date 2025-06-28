@@ -383,6 +383,8 @@ def initialize_chrome_driver(worker_id: int = 1, headless: bool = True, use_unde
             options.add_argument(f'--user-data-dir={temp_profile}')
             options.add_argument('--no-first-run')
             options.add_argument('--no-default-browser-check')
+            options.add_argument('--disable-features=ChromeWhatsNewUI')  # Chrome 새 기능 UI 비활성화
+            options.add_argument('--disable-search-engine-choice-screen')  # 검색엔진 선택 화면 비활성화
             
             # Chrome 버전 확인하여 메이저 버전 전달
             chrome_version = manager.get_chrome_version()
@@ -436,6 +438,15 @@ def initialize_chrome_driver(worker_id: int = 1, headless: bool = True, use_unde
         options.add_argument('--disable-logging')
         options.add_argument('--log-level=3')
         options.add_argument('--disable-gpu')
+        
+        # Chrome 프로필 선택 화면 우회 옵션 추가
+        import tempfile
+        temp_profile = tempfile.mkdtemp(prefix="chrome_profile_")
+        options.add_argument(f'--user-data-dir={temp_profile}')
+        options.add_argument('--no-first-run')
+        options.add_argument('--no-default-browser-check')
+        options.add_argument('--disable-features=ChromeWhatsNewUI')
+        options.add_argument('--disable-search-engine-choice-screen')
         
         # 추가 옵션 적용
         if extra_options:
