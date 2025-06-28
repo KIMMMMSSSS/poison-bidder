@@ -21,6 +21,11 @@ from typing import Optional, Tuple
 logger = logging.getLogger(__name__)
 
 
+class ChromeDriverInitError(Exception):
+    """Chrome 드라이버 초기화 실패 시 발생하는 예외"""
+    pass
+
+
 class ChromeDriverManager:
     """Chrome 브라우저와 ChromeDriver 버전을 자동으로 관리하는 통합 클래스"""
     
@@ -319,6 +324,44 @@ def get_chrome_version() -> Optional[str]:
     return manager.get_chrome_version()
 
 
+def cleanup_chrome_processes():
+    """Chrome 관련 프로세스를 안전하게 정리"""
+    logger.info("Chrome 프로세스 정리 시작...")
+    
+    # Windows 환경에서 taskkill 사용
+    if platform.system() == "Windows":
+        chrome_processes = ['chrome.exe', 'chromedriver.exe']
+        for process in chrome_processes:
+            try:
+                result = subprocess.run(
+                    ['taskkill', '/F', '/IM', process],
+                    capture_output=True,
+                    text=True,
+                    creationflags=subprocess.CREATE_NO_WINDOW if platform.system() == "Windows" else 0
+                )
+                if result.returncode == 0:
+                    logger.info(f"{process} 프로세스 종료 완료")
+                    time.sleep(0.5)  # 프로세스 종료 대기
+            except Exception as e:
+                logger.debug(f"{process} 종료 중 오류 (무시 가능): {e}")
+    
+    # psutil이 설치된 경우 추가 정리
+    try:
+        import psutil
+        for proc in psutil.process_iter(['pid', 'name']):
+            try:
+                proc_name = proc.info['name'].lower()
+                if 'chrome' in proc_name or 'chromedriver' in proc_name:
+                    proc.kill()
+                    logger.debug(f"psutil로 {proc_name} (PID: {proc.info['pid']}) 종료")
+            except Exception:
+                pass
+    except ImportError:
+        logger.debug("psutil이 설치되지 않음 - taskkill만 사용")
+    except Exception as e:
+        logger.debug(f"psutil 프로세스 정리 중 오류: {e}")
+
+
 def initialize_chrome_driver(worker_id: int = 1, headless: bool = True, use_undetected: bool = True, extra_options: list = None):
     """
     Chrome 드라이버 초기화 헬퍼 함수
@@ -332,12 +375,21 @@ def initialize_chrome_driver(worker_id: int = 1, headless: bool = True, use_unde
         
     Returns:
         driver: 초기화된 Chrome 드라이버 객체
+        
+    Raises:
+        ChromeDriverInitError: 드라이버 초기화 실패 시
     """
+    logger.info(f"[Worker {worker_id}] Chrome 드라이버 초기화 시작...")
+    
     manager = ChromeDriverManager()
     driver_path = manager.ensure_driver()
     
     if not driver_path:
-        raise Exception("ChromeDriver 초기화 실패")
+        error_msg = f"[Worker {worker_id}] ChromeDriver 경로를 확보할 수 없습니다."
+        logger.error(error_msg)
+        raise ChromeDriverInitError(error_msg)
+    
+    logger.info(f"[Worker {worker_id}] ChromeDriver 경로: {driver_path}")
     
     # ABC마트와 같은 특정 사이트의 경우 일반 selenium 우선 사용
     force_regular_selenium = False
@@ -346,11 +398,15 @@ def initialize_chrome_driver(worker_id: int = 1, headless: bool = True, use_unde
             if "abcmart" in opt.lower() or "force-regular-selenium" in opt:
                 force_regular_selenium = True
                 use_undetected = False
+                logger.info(f"[Worker {worker_id}] ABC마트 모드 - 일반 Selenium 사용")
                 break
-        
-    # undetected-chromedriver 우선 사용
-    if use_undetected:
+    
+    driver = None
+    
+    # undetected-chromedriver 시도
+    if use_undetected and not force_regular_selenium:
         try:
+            logger.info(f"[Worker {worker_id}] undetected-chromedriver 초기화 시도...")
             import undetected_chromedriver as uc
             
             options = uc.ChromeOptions()
@@ -383,8 +439,10 @@ def initialize_chrome_driver(worker_id: int = 1, headless: bool = True, use_unde
             options.add_argument(f'--user-data-dir={temp_profile}')
             options.add_argument('--no-first-run')
             options.add_argument('--no-default-browser-check')
-            options.add_argument('--disable-features=ChromeWhatsNewUI')  # Chrome 새 기능 UI 비활성화
-            options.add_argument('--disable-search-engine-choice-screen')  # 검색엔진 선택 화면 비활성화
+            options.add_argument('--disable-features=ChromeWhatsNewUI')
+            options.add_argument('--disable-search-engine-choice-screen')
+            
+            logger.info(f"[Worker {worker_id}] 임시 프로필 생성: {temp_profile}")
             
             # Chrome 버전 확인하여 메이저 버전 전달
             chrome_version = manager.get_chrome_version()
@@ -393,20 +451,20 @@ def initialize_chrome_driver(worker_id: int = 1, headless: bool = True, use_unde
                 logger.info(f"[Worker {worker_id}] Chrome {major_version} 감지, 해당 버전용 드라이버 사용")
                 
                 # Chrome 프로세스 정리 (새로운 Chrome 시작 전)
-                import subprocess
                 try:
                     subprocess.run(["taskkill", "/F", "/IM", "chrome.exe"], capture_output=True)
                     time.sleep(1)
-                except:
-                    pass
+                    logger.info(f"[Worker {worker_id}] 기존 Chrome 프로세스 정리 완료")
+                except Exception as e:
+                    logger.warning(f"[Worker {worker_id}] Chrome 프로세스 정리 실패: {e}")
                 
                 # suppress_welcome 옵션 추가로 더 빠른 시작
                 driver = uc.Chrome(
                     options=options, 
                     version_main=major_version,
-                    suppress_welcome=True,  # 환영 화면 억제
-                    use_subprocess=True,     # 서브프로세스 사용
-                    driver_executable_path=driver_path  # 명시적 드라이버 경로
+                    suppress_welcome=True,
+                    use_subprocess=True,
+                    driver_executable_path=driver_path
                 )
             else:
                 driver = uc.Chrome(
@@ -417,46 +475,80 @@ def initialize_chrome_driver(worker_id: int = 1, headless: bool = True, use_unde
                     driver_executable_path=driver_path
                 )
             
+            # 드라이버 유효성 검증
+            if driver is None:
+                raise Exception("undetected-chromedriver가 None을 반환했습니다.")
+            
+            # 드라이버 기본 기능 테스트
+            driver.set_page_load_timeout(30)
             logger.info(f"[Worker {worker_id}] undetected-chromedriver 초기화 성공")
             return driver
             
         except Exception as e:
             logger.warning(f"[Worker {worker_id}] undetected-chromedriver 실패: {e}")
-        
-        # fallback to selenium
-        from selenium import webdriver
-        from selenium.webdriver.chrome.service import Service
-        
-        options = webdriver.ChromeOptions()
-        if headless:
-            options.add_argument('--headless')
-        options.add_argument('--no-sandbox')
-        options.add_argument('--disable-dev-shm-usage')
-        options.add_argument('--window-size=1920,1080')
-        
-        # 동일한 메모리 최적화 옵션
-        options.add_argument('--disable-logging')
-        options.add_argument('--log-level=3')
-        options.add_argument('--disable-gpu')
-        
-        # Chrome 프로필 선택 화면 우회 옵션 추가
-        import tempfile
-        temp_profile = tempfile.mkdtemp(prefix="chrome_profile_")
-        options.add_argument(f'--user-data-dir={temp_profile}')
-        options.add_argument('--no-first-run')
-        options.add_argument('--no-default-browser-check')
-        options.add_argument('--disable-features=ChromeWhatsNewUI')
-        options.add_argument('--disable-search-engine-choice-screen')
-        
-        # 추가 옵션 적용
-        if extra_options:
-            for option in extra_options:
-                options.add_argument(option)
-        
-        service = Service(driver_path)
-        driver = webdriver.Chrome(service=service, options=options)
-        logger.info(f"[Worker {worker_id}] selenium webdriver 초기화 성공")
-        return driver
+            if driver:
+                try:
+                    driver.quit()
+                except:
+                    pass
+            driver = None
+    
+    # selenium webdriver로 시도
+    if driver is None:
+        try:
+            logger.info(f"[Worker {worker_id}] 일반 Selenium WebDriver 초기화 시도...")
+            from selenium import webdriver
+            from selenium.webdriver.chrome.service import Service
+            
+            options = webdriver.ChromeOptions()
+            if headless:
+                options.add_argument('--headless')
+            options.add_argument('--no-sandbox')
+            options.add_argument('--disable-dev-shm-usage')
+            options.add_argument('--window-size=1920,1080')
+            
+            # 동일한 메모리 최적화 옵션
+            options.add_argument('--disable-logging')
+            options.add_argument('--log-level=3')
+            options.add_argument('--disable-gpu')
+            
+            # Chrome 프로필 선택 화면 우회 옵션 추가
+            import tempfile
+            temp_profile = tempfile.mkdtemp(prefix="chrome_profile_")
+            options.add_argument(f'--user-data-dir={temp_profile}')
+            options.add_argument('--no-first-run')
+            options.add_argument('--no-default-browser-check')
+            options.add_argument('--disable-features=ChromeWhatsNewUI')
+            options.add_argument('--disable-search-engine-choice-screen')
+            
+            logger.info(f"[Worker {worker_id}] 임시 프로필 생성: {temp_profile}")
+            
+            # 추가 옵션 적용
+            if extra_options:
+                for option in extra_options:
+                    options.add_argument(option)
+            
+            service = Service(driver_path)
+            driver = webdriver.Chrome(service=service, options=options)
+            
+            # 드라이버 유효성 검증
+            if driver is None:
+                raise Exception("Selenium WebDriver가 None을 반환했습니다.")
+            
+            # 드라이버 기본 기능 테스트
+            driver.set_page_load_timeout(30)
+            logger.info(f"[Worker {worker_id}] Selenium WebDriver 초기화 성공")
+            return driver
+            
+        except Exception as e:
+            error_msg = f"[Worker {worker_id}] 모든 드라이버 초기화 방법 실패: {e}"
+            logger.error(error_msg)
+            if driver:
+                try:
+                    driver.quit()
+                except:
+                    pass
+            raise ChromeDriverInitError(error_msg)
 
 
 # 메인 실행 시 테스트
