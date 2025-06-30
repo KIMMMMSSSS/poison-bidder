@@ -10,6 +10,7 @@ import undetected_chromedriver as uc
 from pathlib import Path
 import tempfile
 import time
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +25,23 @@ def get_chrome_driver(headless=False, disable_gpu=True):
     Returns:
         uc.Chrome: 설정된 Chrome 드라이버 인스턴스
     """
+    # Chrome 설정 파일 읽기
+    config_path = Path("config/chrome_settings.json")
+    if config_path.exists():
+        try:
+            with open(config_path, 'r', encoding='utf-8') as f:
+                chrome_config = json.load(f)
+                # 설정 파일의 headless 설정을 우선시함
+                headless = chrome_config.get('headless', headless)
+                disable_gpu = chrome_config.get('disable_gpu', disable_gpu)
+                logger.info(f"Chrome 설정 파일 로드: headless={headless}, disable_gpu={disable_gpu}")
+        except Exception as e:
+            logger.warning(f"Chrome 설정 파일 읽기 실패: {e}")
+    
+    # 환경 변수로도 오버라이드 가능
+    if os.environ.get('CHROME_HEADLESS', '').lower() == 'false':
+        headless = False
+        logger.info("CHROME_HEADLESS 환경 변수에 의해 headless 모드 비활성화")
     options = uc.ChromeOptions()
     
     # 기본 옵션 설정

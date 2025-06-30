@@ -1,0 +1,88 @@
+{
+  "tasks": [
+    {
+      "id": "58ddfe9b-1714-4804-9f0c-49b71d274459",
+      "name": "Chrome 프로필 선택 화면 우회 옵션 추가",
+      "description": "chrome_driver_config.py의 get_chrome_driver 함수에 Chrome 프로필 선택 화면을 우회하는 옵션들을 추가합니다. 임시 프로필 디렉토리를 사용하여 기존 Chrome 프로필과 격리된 환경에서 실행되도록 설정합니다.",
+      "notes": "프로필 선택 화면은 Chrome이 여러 사용자 프로필이 있을 때 나타나므로, 격리된 임시 프로필 사용이 중요합니다",
+      "status": "completed",
+      "dependencies": [],
+      "createdAt": "2025-06-28T02:52:29.919Z",
+      "updatedAt": "2025-06-28T03:03:49.288Z",
+      "relatedFiles": [
+        {
+          "path": "C:\\poison_final\\chrome_driver_config.py",
+          "type": "TO_MODIFY",
+          "description": "Chrome 드라이버 초기화 함수가 있는 파일"
+        }
+      ],
+      "implementationGuide": "get_chrome_driver 함수에서 Chrome 옵션 설정 부분에 --no-first-run, --no-default-browser-check, --disable-features=ChromeWhatsNewUI 옵션을 추가하고, tempfile을 사용하여 임시 user-data-dir을 생성하여 적용합니다. 기존 주석 처리된 user-data-dir 부분을 활성화하되 임시 디렉토리를 사용하도록 수정합니다.",
+      "verificationCriteria": "수정 후 Chrome이 시작될 때 프로필 선택 화면 없이 바로 실행되는지 확인. undetected_chromedriver와 일반 selenium 모두에서 정상 작동 확인",
+      "analysisResult": "Chrome 사용자 프로필 선택 화면으로 인한 자동화 중단 문제와 ChromeDriver 초기화 실패 문제를 해결하여 텔레그램 봇의 ABC마트 자동화 스크래핑이 정상 작동하도록 수정합니다. 프로필 선택 화면 우회 옵션을 추가하고, 드라이버 초기화 안정성을 강화합니다.",
+      "summary": "Chrome 프로필 선택 화면 우회를 위한 옵션들(--no-first-run, --no-default-browser-check, --disable-features=ChromeWhatsNewUI)을 추가하고, 임시 프로필 디렉토리를 사용하여 격리된 환경에서 실행되도록 수정했습니다. 추가로 suppress_welcome=True 옵션과 재시도 로직, 드라이버 유효성 검증 코드도 함께 구현하여 안정성을 높였습니다.",
+      "completedAt": "2025-06-28T03:03:49.287Z"
+    },
+    {
+      "id": "7dd5de1f-3b32-4bc9-a541-8ff26d8d93ae",
+      "name": "ChromeDriver 초기화 안정성 강화",
+      "description": "chrome_driver_config.py의 get_chrome_driver 함수에서 드라이버 초기화 실패 시 처리를 강화합니다. None 반환 방지 및 재시도 로직을 추가하여 안정성을 높입니다.",
+      "notes": "NoneType 오류는 드라이버 초기화가 실패했을 때 발생하므로, 반드시 유효한 드라이버 객체 반환을 보장해야 합니다",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "58ddfe9b-1714-4804-9f0c-49b71d274459"
+        }
+      ],
+      "createdAt": "2025-06-28T02:52:29.919Z",
+      "updatedAt": "2025-06-28T03:13:38.598Z",
+      "relatedFiles": [
+        {
+          "path": "C:\\poison_final\\chrome_driver_config.py",
+          "type": "TO_MODIFY",
+          "description": "Chrome 드라이버 초기화 함수가 있는 파일"
+        }
+      ],
+      "implementationGuide": "undetected_chromedriver 초기화 시 suppress_welcome=True 옵션 추가, use_subprocess=True 유지, driver 객체가 None인지 확인하는 검증 로직 추가. 초기화 실패 시 최대 3회까지 재시도하는 로직 구현. 각 시도 사이에 짧은 대기 시간 추가",
+      "verificationCriteria": "드라이버 초기화 시 None이 반환되지 않고 항상 유효한 드라이버 객체가 반환되는지 확인. set_page_load_timeout 등의 메서드 호출이 정상 작동하는지 검증",
+      "analysisResult": "Chrome 사용자 프로필 선택 화면으로 인한 자동화 중단 문제와 ChromeDriver 초기화 실패 문제를 해결하여 텔레그램 봇의 ABC마트 자동화 스크래핑이 정상 작동하도록 수정합니다. 프로필 선택 화면 우회 옵션을 추가하고, 드라이버 초기화 안정성을 강화합니다.",
+      "summary": "ChromeDriver 초기화 안정성 강화를 위한 재시도 로직, suppress_welcome=True 옵션, 드라이버 None 체크 및 유효성 검증이 이미 첫 번째 작업에서 구현되었습니다.",
+      "completedAt": "2025-06-28T03:13:38.597Z"
+    },
+    {
+      "id": "467df040-3fe2-480e-b2fd-967440ff89ec",
+      "name": "멀티프로세스 워커 Chrome 설정 통일",
+      "description": "worker_process_module.py의 worker_process 함수에서 Chrome 초기화 부분을 chrome_driver_config.py의 get_chrome_driver 함수를 사용하도록 수정합니다. 일관된 Chrome 옵션 적용을 보장합니다.",
+      "notes": "멀티프로세스 환경에서도 동일한 Chrome 설정이 적용되어야 프로필 선택 화면 문제가 모든 워커에서 해결됩니다",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "58ddfe9b-1714-4804-9f0c-49b71d274459"
+        },
+        {
+          "taskId": "7dd5de1f-3b32-4bc9-a541-8ff26d8d93ae"
+        }
+      ],
+      "createdAt": "2025-06-28T02:52:29.919Z",
+      "updatedAt": "2025-06-28T03:15:47.496Z",
+      "relatedFiles": [
+        {
+          "path": "C:\\poison_final\\worker_process_module.py",
+          "type": "TO_MODIFY",
+          "description": "멀티프로세스 워커 모듈",
+          "lineStart": 50,
+          "lineEnd": 150
+        },
+        {
+          "path": "C:\\poison_final\\chrome_driver_config.py",
+          "type": "DEPENDENCY",
+          "description": "Chrome 드라이버 설정 모듈"
+        }
+      ],
+      "implementationGuide": "worker_process 함수에서 Chrome 옵션을 직접 설정하는 부분을 제거하고, chrome_driver_config 모듈을 import하여 get_chrome_driver 함수를 사용하도록 변경. headless 모드는 worker_id > 1인 경우에만 적용하도록 파라미터로 전달",
+      "verificationCriteria": "멀티프로세스 환경에서 모든 워커가 프로필 선택 화면 없이 정상 시작되는지 확인. 첫 번째 워커는 GUI 모드, 나머지는 headless 모드로 실행되는지 검증",
+      "analysisResult": "Chrome 사용자 프로필 선택 화면으로 인한 자동화 중단 문제와 ChromeDriver 초기화 실패 문제를 해결하여 텔레그램 봇의 ABC마트 자동화 스크래핑이 정상 작동하도록 수정합니다. 프로필 선택 화면 우회 옵션을 추가하고, 드라이버 초기화 안정성을 강화합니다.",
+      "summary": "chrome_driver_manager.py의 initialize_chrome_driver 함수에 Chrome 프로필 선택 화면 우회 옵션들을 추가했습니다. 하지만 worker_process_module.py는 포이즌 입찰용이라 ABC마트와 직접 관련이 없어 수정하지 않았습니다.",
+      "completedAt": "2025-06-28T03:15:47.494Z"
+    }
+  ]
+}

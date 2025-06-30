@@ -1,0 +1,23 @@
+{
+  "headless": true,
+  "disable_gpu": true,
+  "window_size": {
+    "width": 1920,
+    "height": 1080
+  },
+  "timeout": {
+    "page_load": 30,
+    "script": 30,
+    "implicit_wait": 10
+  },
+  "options": [
+    "--no-sandbox",
+    "--disable-dev-shm-usage",
+    "--disable-blink-features=AutomationControlled",
+    "--disable-infobars",
+    "--no-first-run",
+    "--no-default-browser-check",
+    "--disable-features=ChromeWhatsNewUI",
+    "--disable-search-engine-choice-screen"
+  ]
+}
