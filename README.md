@@ -118,3 +118,7 @@ python test/test_chrome138_integration.py
 - [텔레그램 봇 가이드](TELEGRAM_BOT_GUIDE.md)
 - [스케줄러 가이드](SCHEDULER_GUIDE.md)
 - [자동 입찰 가이드](AUTO_BIDDING_GUIDE.md)
+
+## 🔗 관련 프로젝트
+
+- [타오바오 트래킹 번호 추출기](https://github.com/KIMMMMSSSS/taobao-tracking) - Chrome 확장 프로그램으로 타오바오/T몰 주문 정보를 자동 추출
