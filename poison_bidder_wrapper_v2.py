@@ -1049,7 +1049,7 @@ class PoizonAutoBidderWorker:
                 return 0, len(entries)  # 검색 실패 시 모두 실패
             
             # 2) Create listings
-            self.create_listings()
+            self.create_listings(code)
             
             # 3) 리전 설정
             self.setup_regions()
@@ -1653,7 +1653,7 @@ class PoizonAutoBidderWorker:
             return False
 
     @retry_on_page_load_failure()
-    def create_listings(self):
+    def create_listings(self, search_code):
         self.log_to_queue("[STEP] Create listings")
         
         # 검색 결과 페이지가 완전히 로드될 때까지 대기
@@ -1682,38 +1682,64 @@ class PoizonAutoBidderWorker:
             raise TimeoutException("페이지가 정상적으로 로드되지 않았습니다")
         
         try:
-            # Create listings 버튼 찾기 및 클릭
-            # 여러 방법으로 버튼 찾기 시도
-            create_button = None
+            # 검색 결과 테이블의 모든 행 가져오기
+            rows = self.driver.find_elements(By.CSS_SELECTOR, 'tbody.ant-table-tbody tr')
+            self.log_to_queue(f"[INFO] 검색 결과 {len(rows)}개 확인 중...")
             
-            # 방법 1: 텍스트로 찾기
-            try:
-                create_button = WebDriverWait(self.driver, 5).until(
-                    EC.element_to_be_clickable((By.XPATH, "//button[.//span[text()='Create listings']]"))
-                )
-            except:
-                pass
-            
-            # 방법 2: 부분 클래스명으로 찾기
-            if not create_button:
+            # 각 행에서 상품 코드 확인
+            for row in rows:
                 try:
-                    buttons = self.driver.find_elements(By.CSS_SELECTOR, "button.ant-btn")
-                    for btn in buttons:
-                        if "Create listings" in btn.text:
-                            create_button = btn
-                            break
-                except:
-                    pass
+                    # 상품 코드 요소 찾기
+                    article_elem = row.find_element(By.CSS_SELECTOR, "._articleNumberWrap_1iysw_97")
+                    article_number = article_elem.text.strip()
+                    
+                    # 앞 2자리 비교
+                    if len(article_number) >= 2 and len(search_code) >= 2:
+                        if article_number[:2].upper() == search_code[:2].upper():
+                            self.log_to_queue(f"[OK] 일치하는 상품 발견: {article_number} (검색: {search_code})")
+                            
+                            # 해당 행의 Create listings 버튼 찾기
+                            create_button = None
+                            
+                            # 방법 1: 같은 행 내에서 버튼 찾기
+                            try:
+                                create_button = row.find_element(
+                                    By.XPATH, ".//button[contains(.//span/text(), 'Create listings')]"
+                                )
+                            except:
+                                # 방법 2: 다른 셀렉터로 시도
+                                try:
+                                    create_button = row.find_element(
+                                        By.XPATH, ".//button[contains(., 'Create listings')]"
+                                    )
+                                except:
+                                    pass
+                            
+                            if create_button:
+                                # 버튼이 클릭 가능한 상태가 될 때까지 대기
+                                WebDriverWait(self.driver, 5).until(
+                                    EC.element_to_be_clickable(create_button)
+                                )
+                                create_button.click()
+                                
+                                # 리전 탭이 나타날 때까지 대기
+                                WebDriverWait(self.driver, 5).until(
+                                    EC.presence_of_element_located((By.XPATH, "//div[@class='tabItem___vEvcb']"))
+                                )
+                                self.log_to_queue("[OK] Create listings 완료")
+                                return True
+                            else:
+                                self.log_to_queue(f"[WARN] Create listings 버튼을 찾을 수 없음: {article_number}")
+                        else:
+                            self.log_to_queue(f"[DEBUG] 불일치: {article_number} vs {search_code}")
+                    
+                except Exception as e:
+                    self.log_to_queue(f"[DEBUG] 행 처리 중 오류: {type(e).__name__}")
+                    continue
             
-            if create_button:
-                create_button.click()
-                # 리전 탭이 나타날 때까지 대기
-                WebDriverWait(self.driver, 5).until(
-                    EC.presence_of_element_located((By.XPATH, "//div[@class='tabItem___vEvcb']"))
-                )
-                self.log_to_queue("[OK] Create listings 완료")
-            else:
-                raise TimeoutException("Create listings 버튼을 찾을 수 없습니다")
+            # 일치하는 상품을 찾지 못한 경우
+            self.log_to_queue(f"[ERROR] 앞 2자리가 일치하는 상품을 찾을 수 없음: {search_code}")
+            raise TimeoutException(f"일치하는 상품 없음: {search_code}")
                 
         except TimeoutException:
             # TimeoutException은 그대로 발생시켜 재시도 데코레이터가 처리하도록 함
