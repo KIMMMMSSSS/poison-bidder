@@ -157,6 +157,54 @@ COLOR_ABBREVIATIONS = {
 }
 
 
+
+def change_language_to_english(driver, result_queue, worker_id):
+    """언어를 영어로 변경"""
+    try:
+        # 언어 드롭다운 찾기 (두 개 중 두 번째가 언어 선택)
+        language_dropdowns = driver.find_elements(By.CSS_SELECTOR, '.ant-dropdown-trigger')
+        
+        if len(language_dropdowns) >= 2:
+            # 두 번째 드롭다운이 언어 선택기
+            language_dropdown = language_dropdowns[1]
+            current_language = language_dropdown.text.strip()
+            result_queue.put(("LOG", f"[Worker {worker_id}] 현재 언어: {current_language}"))
+            
+            # 이미 영어인 경우
+            if "English" in current_language:
+                result_queue.put(("LOG", f"[Worker {worker_id}] 이미 영어로 설정되어 있습니다."))
+                return True
+                
+            # 드롭다운 클릭
+            language_dropdown.click()
+            time.sleep(1)
+            
+            # 드롭다운 메뉴 대기
+            wait = WebDriverWait(driver, 5)
+            dropdown_menu = wait.until(
+                EC.visibility_of_element_located((By.CSS_SELECTOR, '.ant-dropdown:not(.ant-dropdown-hidden)'))
+            )
+            
+            # 메뉴 아이템들 찾기
+            menu_items = dropdown_menu.find_elements(By.CSS_SELECTOR, '.ant-dropdown-menu-item')
+            
+            # 영어 옵션 찾기
+            for item in menu_items:
+                item_text = item.text.strip()
+                result_queue.put(("LOG", f"[Worker {worker_id}] 언어 옵션: {item_text}"))
+                
+                if 'English' in item_text:
+                    item.click()
+                    result_queue.put(("LOG", f"[Worker {worker_id}] 영어로 변경 중..."))
+                    time.sleep(2)  # 페이지 리로드 대기
+                    return True
+                    
+        return False
+        
+    except Exception as e:
+        result_queue.put(("ERROR", f"[Worker {worker_id}] 언어 변경 실패: {e}"))
+        return False
+
 def log_processor_worker(result_queue, result_list_queue):
     """로그 처리 워커 프로세스 (모듈 레벨 함수)"""
     results = []
@@ -300,6 +348,29 @@ def worker_process_wrapper(worker_id, task_queue, result_queue, status_dict, log
             bidder.driver.get("https://seller.poizon.com/main/dataBoard")
             result_queue.put(("LOG", f"[Worker {worker_id}] 로그인 페이지 로드 중..."))
             time.sleep(5)
+            
+            # 페이지 언어 확인 및 변경
+            try:
+                html_lang = bidder.driver.find_element(By.TAG_NAME, 'html').get_attribute('lang')
+                result_queue.put(("LOG", f"[Worker {worker_id}] 페이지 언어: {html_lang}"))
+                
+                if html_lang == 'zh':  # 중국어인 경우
+                    result_queue.put(("LOG", f"[Worker {worker_id}] 중국어 페이지 감지. 영어로 변경 시도..."))
+                    if change_language_to_english(bidder.driver, result_queue, worker_id):
+                        result_queue.put(("LOG", f"[Worker {worker_id}] 언어 변경 성공!"))
+                    else:
+                        result_queue.put(("LOG", f"[Worker {worker_id}] 언어 변경 실패. 중국어로 진행..."))
+                        # URL 파라미터로 언어 강제 설정 시도
+                        current_url = bidder.driver.current_url
+                        if "?" in current_url:
+                            bidder.driver.get(current_url + "&lang=en")
+                        else:
+                            bidder.driver.get(current_url + "?lang=en")
+                        time.sleep(2)
+            except Exception as e:
+                result_queue.put(("LOG", f"[Worker {worker_id}] 언어 확인 오류: {e}"))
+            
+            time.sleep(3)
             
             # 로그인 페이지인지 확인
             try:
@@ -802,21 +873,34 @@ class PoizonAutoBidderWorker:
             
             # 2. 주요 요소 존재 여부 확인 (JavaScript로 빠르게 체크)
             elements_check = self.driver.execute_script("""
-                // 검색창 확인
+                // 검색창 확인 - 검색 결과 페이지에서는 없을 수도 있음
                 var searchBox = document.getElementById('Item Info');
-                if (!searchBox) {
-                    return {success: false, missing: 'search_box'};
-                }
                 
                 // Create listings 버튼 확인
                 var createBtn = document.querySelector("button[class*='ant-btn']");
-                if (!createBtn) {
-                    // 버튼이 없어도 검색창이 있으면 기본 페이지는 로드된 것
-                    return {success: true, warning: 'no_create_button'};
-                }
                 
                 // 테이블 존재 여부 확인 (선택적)
                 var table = document.querySelector("tbody.ant-table-tbody");
+                
+                // 검색 결과 페이지인지 확인
+                var isSearchResultPage = table !== null || 
+                                       document.querySelector(".ant-table-wrapper") !== null;
+                
+                // 검색 결과 페이지라면 테이블만 있어도 OK
+                if (isSearchResultPage) {
+                    return {
+                        success: true,
+                        isSearchResultPage: true,
+                        searchBox: searchBox ? true : false,
+                        createBtn: createBtn ? true : false,
+                        table: table ? true : false
+                    };
+                }
+                
+                // 일반 페이지라면 검색창은 필수
+                if (!searchBox) {
+                    return {success: false, missing: 'search_box'};
+                }
                 
                 return {
                     success: true,
@@ -1504,13 +1588,48 @@ class PoizonAutoBidderWorker:
                 # 검색 버튼을 못 찾으면 Enter 키로 검색
                 search_box.send_keys(Keys.RETURN)
             
-            # 검색 결과 로드 대기 (WebDriverWait 사용)
+            # 검색 결과 로드 대기 - 개선된 로직
+            self.log_to_queue("[INFO] 검색 결과 로딩 대기 중...")
+            
+            # 방법 1: 페이지 로딩 완료 대기
+            WebDriverWait(self.driver, 10).until(
+                lambda driver: driver.execute_script("return document.readyState") == "complete"
+            )
+            
+            # 방법 2: AJAX 요청 완료 대기 (jQuery 사용하는 경우)
             try:
-                WebDriverWait(self.driver, 3).until(
-                    EC.presence_of_element_located((By.CSS_SELECTOR, 'tbody.ant-table-tbody tr'))
+                WebDriverWait(self.driver, 10).until(
+                    lambda driver: driver.execute_script(
+                        "return (typeof jQuery !== 'undefined' && jQuery.active == 0) || true"
+                    )
                 )
+            except:
+                pass  # jQuery가 없어도 계속 진행
+            
+            # 방법 3: 테이블이나 검색 결과 관련 요소 대기
+            try:
+                # 커스텀 대기 조건: 테이블이 나타나거나 "no data" 메시지가 나타날 때까지 대기
+                def table_or_no_data(driver):
+                    # 테이블 확인
+                    tables = driver.find_elements(By.CSS_SELECTOR, 'tbody.ant-table-tbody tr')
+                    if tables:
+                        return True
+                    # No data 메시지 확인
+                    no_data = driver.find_elements(By.XPATH, "//div[contains(text(), 'No data')]")
+                    if no_data:
+                        return True
+                    # 빈 상태 메시지 확인
+                    empty = driver.find_elements(By.XPATH, "//div[contains(@class, 'ant-empty')]")
+                    if empty:
+                        return True
+                    return False
+                
+                WebDriverWait(self.driver, 10).until(table_or_no_data)
             except TimeoutException:
-                pass  # 검색 결과가 없을 수도 있음
+                self.log_to_queue("[WARN] 검색 결과 로딩 타임아웃")
+            
+            # 추가 안정성을 위한 짧은 대기
+            time.sleep(0.5)
             
             # 검색 결과 확인
             results = self.driver.find_elements(
@@ -1537,25 +1656,68 @@ class PoizonAutoBidderWorker:
     def create_listings(self):
         self.log_to_queue("[STEP] Create listings")
         
+        # 검색 결과 페이지가 완전히 로드될 때까지 대기
+        self.log_to_queue("[INFO] 페이지 안정화 대기...")
+        
+        # 1. 페이지 로딩 완료 대기
+        WebDriverWait(self.driver, 10).until(
+            lambda driver: driver.execute_script("return document.readyState") == "complete"
+        )
+        
+        # 2. 테이블이 나타날 때까지 대기
+        try:
+            WebDriverWait(self.driver, 10).until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, 'tbody.ant-table-tbody'))
+            )
+            self.log_to_queue("[OK] 검색 결과 테이블 확인")
+        except TimeoutException:
+            self.log_to_queue("[WARN] 검색 결과 테이블을 찾을 수 없음")
+        
+        # 3. 추가 안정화 대기
+        time.sleep(1)
+        
         # 페이지 상태 체크
         if not self.check_page_health():
             self.log_to_queue("[WARN] 페이지 상태 불안정 - TimeoutException 발생")
             raise TimeoutException("페이지가 정상적으로 로드되지 않았습니다")
         
         try:
-            # 리스트 로드 대기
-            self.wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, 'tbody.ant-table-tbody tr')))
+            # Create listings 버튼 찾기 및 클릭
+            # 여러 방법으로 버튼 찾기 시도
+            create_button = None
             
-            # Create listings 버튼 클릭
-            self.wait_and_click((By.XPATH, "//button[.//span[text()='Create listings']]"))
-            # 리전 탭이 나타날 때까지 대기 (WebDriverWait 사용)
-            WebDriverWait(self.driver, 5).until(
-                EC.presence_of_element_located((By.XPATH, "//div[@class='tabItem___vEvcb']"))
-            )
-            self.log_to_queue("[OK] Create listings 완료")
+            # 방법 1: 텍스트로 찾기
+            try:
+                create_button = WebDriverWait(self.driver, 5).until(
+                    EC.element_to_be_clickable((By.XPATH, "//button[.//span[text()='Create listings']]"))
+                )
+            except:
+                pass
+            
+            # 방법 2: 부분 클래스명으로 찾기
+            if not create_button:
+                try:
+                    buttons = self.driver.find_elements(By.CSS_SELECTOR, "button.ant-btn")
+                    for btn in buttons:
+                        if "Create listings" in btn.text:
+                            create_button = btn
+                            break
+                except:
+                    pass
+            
+            if create_button:
+                create_button.click()
+                # 리전 탭이 나타날 때까지 대기
+                WebDriverWait(self.driver, 5).until(
+                    EC.presence_of_element_located((By.XPATH, "//div[@class='tabItem___vEvcb']"))
+                )
+                self.log_to_queue("[OK] Create listings 완료")
+            else:
+                raise TimeoutException("Create listings 버튼을 찾을 수 없습니다")
+                
         except TimeoutException:
             # TimeoutException은 그대로 발생시켜 재시도 데코레이터가 처리하도록 함
-            raise TimeoutException("Create listings 버튼을 찾을 수 없습니다")
+            raise
 
     def setup_regions(self):
         """Expand와 Select All만 처리 (탭 클릭 제거)"""
