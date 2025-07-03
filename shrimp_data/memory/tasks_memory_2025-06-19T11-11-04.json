@@ -1,0 +1,63 @@
+{
+  "tasks": [
+    {
+      "id": "bd3825ca-1012-4d38-b49c-6cbf75391905",
+      "name": "auto_bidding.py 수정 - poison_direct_login 통합",
+      "description": "auto_bidding.py의 _execute_auto_bidding 메서드에서 기존 poison_login_manager 대신 poison_integrated_bidding 사용하도록 수정",
+      "notes": "기존 POISON_LOGIN_AVAILABLE 체크 로직 유지하되 import 대상만 변경",
+      "status": "completed",
+      "dependencies": [],
+      "createdAt": "2025-06-19T06:34:19.313Z",
+      "updatedAt": "2025-06-19T06:38:26.013Z",
+      "relatedFiles": [
+        {
+          "path": "C:/poison_final/auto_bidding.py",
+          "type": "TO_MODIFY",
+          "description": "메인 수정 대상 파일",
+          "lineStart": 38,
+          "lineEnd": 42
+        },
+        {
+          "path": "C:/poison_final/auto_bidding.py",
+          "type": "TO_MODIFY",
+          "description": "_execute_auto_bidding 메서드 수정",
+          "lineStart": 304,
+          "lineEnd": 346
+        }
+      ],
+      "implementationGuide": "1. poison_login_manager import 제거\n2. poison_integrated_bidding import 추가\n3. _execute_auto_bidding 메서드 내부 로직을 AutoBiddingAdapter 사용하도록 변경\n4. 로그 경로를 C:/poison_final/logs로 통일",
+      "verificationCriteria": "1. poison_integrated_bidding이 정상 import 되는지 확인\n2. 입찰 실행 시 poison_direct_login의 자동 로그인이 동작하는지 확인\n3. 로그가 C:/poison_final/logs에 저장되는지 확인",
+      "analysisResult": "poison_direct_login.py를 기존 자동 입찰 시스템에 통합. poison_integrated_bidding.py를 활용하여 중복 구현 방지",
+      "summary": "auto_bidding.py를 성공적으로 수정하여 poison_direct_login 통합 완료. poison_login_manager 대신 poison_integrated_bidding.AutoBiddingAdapter 사용하도록 변경하고 로그 경로도 C:/poison_final/logs로 통일함",
+      "completedAt": "2025-06-19T06:38:26.012Z"
+    },
+    {
+      "id": "e1c5faf6-5ff2-4c52-82eb-48bc5d0897fe",
+      "name": "unified_bidding.py 수정 - poison_direct_login 통합",
+      "description": "unified_bidding.py의 _execute_bidding 메서드를 poison_integrated_bidding.AutoBiddingAdapter로 교체",
+      "notes": "기존 시뮬레이션 코드를 실제 입찰 로직으로 교체",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "bd3825ca-1012-4d38-b49c-6cbf75391905"
+        }
+      ],
+      "createdAt": "2025-06-19T06:34:19.313Z",
+      "updatedAt": "2025-06-19T06:50:51.633Z",
+      "relatedFiles": [
+        {
+          "path": "C:/poison_final/unified_bidding.py",
+          "type": "TO_MODIFY",
+          "description": "_execute_bidding 메서드 수정",
+          "lineStart": 217,
+          "lineEnd": 240
+        }
+      ],
+      "implementationGuide": "1. poison_integrated_bidding import 추가\n2. _execute_bidding 메서드 전체를 AutoBiddingAdapter 사용하도록 재작성\n3. 결과 형식 변환 로직 추가",
+      "verificationCriteria": "1. AutoBiddingAdapter가 정상 동작하는지 확인\n2. 입찰 결과가 올바른 형식으로 반환되는지 확인\n3. 에러 처리가 정상 동작하는지 확인",
+      "analysisResult": "poison_direct_login.py를 기존 자동 입찰 시스템에 통합. poison_integrated_bidding.py를 활용하여 중복 구현 방지",
+      "summary": "unified_bidding.py의 _execute_bidding 메서드를 AutoBiddingAdapter로 성공적으로 교체. poison_integrated_bidding import 추가 및 결과 형식 변환 로직 구현 완료",
+      "completedAt": "2025-06-19T06:50:51.632Z"
+    }
+  ]
+}

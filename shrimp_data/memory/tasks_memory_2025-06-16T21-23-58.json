@@ -1,0 +1,73 @@
+{
+  "tasks": [
+    {
+      "id": "3391f8db-ae8e-4503-9606-6a2f58a41a3f",
+      "name": "상품 코드 추출 로직 강화",
+      "description": "extract_product_code() 메서드를 개선하여 모든 상품의 품번을 안정적으로 추출합니다. JavaScript 실행 방식을 우선으로 하고, 여러 대체 셀렉터를 순차적으로 시도하며, 최종적으로 URL에서 product ID를 추출하는 폴백 로직을 구현합니다.",
+      "status": "completed",
+      "dependencies": [],
+      "createdAt": "2025-06-15T15:05:17.524Z",
+      "updatedAt": "2025-06-15T15:14:16.937Z",
+      "relatedFiles": [
+        {
+          "path": "C:/poison_final/musinsa_scraper.py",
+          "type": "TO_MODIFY",
+          "description": "extract_product_code 메서드 수정",
+          "lineStart": 130,
+          "lineEnd": 138
+        }
+      ],
+      "implementationGuide": "1. JavaScript로 품번 직접 추출: driver.execute_script(\\\"return document.querySelector('dt:contains(품번)').nextElementSibling?.textContent\\\")\\n2. XPath 대체 셀렉터 추가: //dt[text()='품번']/following-sibling::dd, //span[contains(@class, 'product-code')]\\n3. CSS 셀렉터 시도: .product-info-table dd, .item-code\\n4. URL 파싱 폴백: re.search(r'/products/(\\d+)', url)로 product ID 추출\\n5. 각 시도마다 try-except로 감싸고 성공 시 즉시 반환",
+      "verificationCriteria": "100개의 다양한 무신사 상품 URL로 테스트하여 95% 이상의 품번 추출 성공률 달성. 추출 실패 시에도 URL의 product ID로 대체 가능",
+      "analysisResult": "musinsa_scraper.py의 상품 코드 추출 실패, 사이즈 정보 누락, 느린 속도 문제를 해결하여 안정성과 성능을 향상시킵니다. JavaScript 실행 방식 도입, 동적 대기 시간 적용, 에러 처리 강화를 통해 스크래핑 성공률과 속도를 개선합니다.",
+      "summary": "상품 코드 추출 로직을 6가지 방법으로 강화 완료. JavaScript 실행을 최우선으로 하고, XPath, CSS 셀렉터, 상품명 파싱, URL 폴백까지 구현하여 안정성 극대화",
+      "completedAt": "2025-06-15T15:14:16.918Z"
+    },
+    {
+      "id": "b5781a24-dd70-4b75-87f6-67e826d036be",
+      "name": "사이즈 추출 성능 최적화",
+      "description": "extract_sizes_and_prices() 메서드의 대기 시간을 동적으로 조정하고 원사이즈 상품 감지를 개선합니다. 불필요한 sleep을 제거하고 WebDriverWait을 활용하여 필요한 만큼만 대기합니다.",
+      "status": "completed",
+      "dependencies": [],
+      "createdAt": "2025-06-15T15:05:17.524Z",
+      "updatedAt": "2025-06-15T15:40:56.531Z",
+      "relatedFiles": [
+        {
+          "path": "C:/poison_final/musinsa_scraper.py",
+          "type": "TO_MODIFY",
+          "description": "extract_sizes_and_prices 메서드 수정",
+          "lineStart": 208,
+          "lineEnd": 370
+        }
+      ],
+      "implementationGuide": "1. 원사이즈 즉시 감지: Stepper 요소만 있고 DropdownTriggerBox가 없으면 FREE 반환\\n2. time.sleep(3) → WebDriverWait(driver, 10).until(EC.presence_of_element_located())\\n3. 드롭다운 열림 대기: wait.until(lambda d: dropdown.get_attribute('data-state') == 'open')\\n4. JavaScript로 옵션 추출: driver.execute_script(\\\"return Array.from(arguments[0].querySelectorAll('[data-mds=StaticDropdownMenuItem]')).map(el => el.textContent)\\\", dropdown_menu)\\n5. 각 대기 지점에 타임아웃 설정 (최대 5초)",
+      "verificationCriteria": "원사이즈 상품과 다중 사이즈 상품 각 50개씩 테스트. 평균 처리 시간 30% 단축. 모든 사이즈 옵션 정확히 추출",
+      "analysisResult": "musinsa_scraper.py의 상품 코드 추출 실패, 사이즈 정보 누락, 느린 속도 문제를 해결하여 안정성과 성능을 향상시킵니다. JavaScript 실행 방식 도입, 동적 대기 시간 적용, 에러 처리 강화를 통해 스크래핑 성공률과 속도를 개선합니다.",
+      "summary": "JavaScript 기반 성능 최적화 완료: 원사이즈 빠른 감지, 드롭다운 상태 확인, 일괄 사이즈 추출, DOM 변경 감지 대기, 폴백 가격 처리 구현",
+      "completedAt": "2025-06-15T15:40:56.527Z"
+    },
+    {
+      "id": "8f5d9bc5-b558-4aa2-ba3f-3708ba362f85",
+      "name": "팝업 처리 유틸리티 함수 생성",
+      "description": "중복된 close_popup() 메서드를 독립적인 유틸리티 함수로 추출하여 코드 재사용성을 높입니다. MusinsaWorker와 MusinsaMultiprocessScraper에서 공통으로 사용합니다.",
+      "status": "completed",
+      "dependencies": [],
+      "createdAt": "2025-06-15T15:05:17.524Z",
+      "updatedAt": "2025-06-15T16:12:53.248Z",
+      "relatedFiles": [
+        {
+          "path": "C:/poison_final/musinsa_scraper.py",
+          "type": "TO_MODIFY",
+          "description": "팝업 처리 함수 통합",
+          "lineStart": 1,
+          "lineEnd": 50
+        }
+      ],
+      "implementationGuide": "1. 파일 상단에 close_musinsa_popup(driver) 함수 생성\\n2. 기존 팝업 셀렉터 리스트와 처리 로직 이동\\n3. JavaScript 클릭 우선, 일반 클릭 폴백\\n4. ESC 키 전송 로직 포함\\n5. 두 클래스의 close_popup 메서드를 새 함수 호출로 대체",
+      "verificationCriteria": "팝업이 있는 페이지와 없는 페이지 각 10개씩 테스트. 모든 종류의 팝업 성공적으로 닫기. 코드 중복 제거 확인",
+      "analysisResult": "musinsa_scraper.py의 상품 코드 추출 실패, 사이즈 정보 누락, 느린 속도 문제를 해결하여 안정성과 성능을 향상시킵니다. JavaScript 실행 방식 도입, 동적 대기 시간 적용, 에러 처리 강화를 통해 스크래핑 성공률과 속도를 개선합니다.",
+      "summary": "팝업 처리 유틸리티 함수 생성 완료. 추가로 드롭다운 선택자 버그 수정. 다양한 팝업 타입 지원, JavaScript/일반 클릭 폴백, ESC 키 처리 구현",
+      "completedAt": "2025-06-15T16:12:53.247Z"
+    }
+  ]
+}

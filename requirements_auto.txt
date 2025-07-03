@@ -1,0 +1,15 @@
+# K-Fashion 자동 입찰 시스템 - 자동화 기능 의존성
+
+# 기존 패키지
+python-telegram-bot==20.7
+apscheduler==3.10.4
+pytz
+python-dotenv==1.0.0
+
+# 자동화 기능을 위한 추가 패키지
+selenium==4.16.0
+undetected-chromedriver==3.5.4
+
+# 선택사항 (성능 향상)
+# aiofiles==23.2.1
+# httpx==0.25.2

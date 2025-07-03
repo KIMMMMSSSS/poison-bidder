@@ -1,0 +1,63 @@
+{
+  "schedules": [
+    {
+      "id": "daily_morning",
+      "name": "아침 정기 입찰",
+      "enabled": false,
+      "trigger": {
+        "type": "cron",
+        "hour": 9,
+        "minute": 0
+      },
+      "job": {
+        "site": "musinsa",
+        "strategy": "basic",
+        "mode": "auto"
+      },
+      "description": "매일 오전 9시 무신사 입찰"
+    },
+    {
+      "id": "daily_evening",
+      "name": "저녁 정기 입찰",
+      "enabled": false,
+      "trigger": {
+        "type": "cron",
+        "hour": 21,
+        "minute": 0
+      },
+      "job": {
+        "site": "musinsa",
+        "strategy": "standard",
+        "mode": "auto"
+      },
+      "description": "매일 오후 9시 무신사 입찰"
+    },
+    {
+      "id": "weekly_abc",
+      "name": "주간 ABC마트 입찰",
+      "enabled": false,
+      "trigger": {
+        "type": "cron",
+        "day_of_week": "mon",
+        "hour": 10,
+        "minute": 0
+      },
+      "job": {
+        "site": "abcmart",
+        "strategy": "basic",
+        "mode": "manual"
+      },
+      "description": "매주 월요일 오전 10시 ABC마트 입찰"
+    }
+  ],
+  "settings": {
+    "timezone": "Asia/Seoul",
+    "max_concurrent_jobs": 1,
+    "job_timeout": 3600,
+    "notification": {
+      "on_start": true,
+      "on_complete": true,
+      "on_error": true
+    }
+  }
+}

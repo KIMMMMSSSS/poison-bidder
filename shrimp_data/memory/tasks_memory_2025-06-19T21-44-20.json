@@ -1,0 +1,154 @@
+{
+  "tasks": [
+    {
+      "id": "427f5c97-5d5c-4f1a-9bde-b68edb0fba0b",
+      "name": "상태 코드 상수 정의 모듈 생성",
+      "description": "표준화된 상태 코드와 관련 상수들을 정의하는 status_constants.py 파일을 생성합니다. 모든 모듈에서 공통으로 사용할 상태 코드, 이모지 매핑, 진행률 가중치 등을 포함합니다.",
+      "notes": "모든 상태 관련 상수는 이 파일에 집중시켜 유지보수성을 높입니다.",
+      "status": "completed",
+      "dependencies": [],
+      "createdAt": "2025-06-19T21:09:34.946Z",
+      "updatedAt": "2025-06-19T21:13:10.546Z",
+      "relatedFiles": [],
+      "implementationGuide": "status_constants.py 파일을 생성하여 STAGE_INITIALIZING, STAGE_LOGIN_CHECK 등의 상태 코드를 정의합니다. STAGE_EMOJIS 딕셔너리로 각 상태별 이모지를 매핑하고, STAGE_WEIGHTS로 진행률 계산용 가중치를 정의합니다.",
+      "verificationCriteria": "status_constants.py 파일이 생성되고 모든 필요한 상태 코드가 정의되어 있으며, import하여 사용할 수 있어야 합니다.",
+      "analysisResult": "텔레그램 봇이 자동 입찰 진행 상황을 실시간으로 정확하게 추적하도록 콜백 메커니즘을 구현합니다. 현재 시간 기반 진행률 표시를 실제 작업 상태와 동기화하여 사용자에게 정확한 정보를 제공합니다.",
+      "summary": "status_constants.py 모듈이 성공적으로 생성되었습니다. 모든 필요한 상태 코드, 이모지 매핑, 진행률 가중치가 정의되었으며, 유틸리티 함수들도 구현되었습니다. import 테스트를 통해 정상 작동을 확인했습니다.",
+      "completedAt": "2025-06-19T21:13:10.545Z"
+    },
+    {
+      "id": "01ff227d-a26e-4f27-83cc-2f96d7c6570f",
+      "name": "auto_bidding 모듈에 콜백 지원 추가",
+      "description": "auto_bidding.py의 run_auto_pipeline 메서드에 status_callback 파라미터를 추가하고, 각 주요 작업 단계에서 콜백을 호출하도록 수정합니다.",
+      "notes": "콜백 호출 시 None 체크를 반드시 수행하고, 오류 발생 시에도 ERROR 상태로 콜백을 호출해야 합니다.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "427f5c97-5d5c-4f1a-9bde-b68edb0fba0b"
+        }
+      ],
+      "createdAt": "2025-06-19T21:09:34.946Z",
+      "updatedAt": "2025-06-19T21:17:51.470Z",
+      "relatedFiles": [
+        {
+          "path": "auto_bidding.py",
+          "type": "TO_MODIFY",
+          "description": "run_auto_pipeline 메서드 수정"
+        },
+        {
+          "path": "status_constants.py",
+          "type": "DEPENDENCY",
+          "description": "상태 코드 임포트"
+        }
+      ],
+      "implementationGuide": "run_auto_pipeline 메서드 시그니처에 status_callback=None 파라미터를 추가합니다. 링크 추출, 스크래핑, 가격 계산, 입찰 실행 각 단계의 시작과 진행 중에 적절한 상태 코드와 진행률로 콜백을 호출합니다. 진행률은 각 단계의 가중치와 세부 진행 상황을 고려하여 계산합니다.",
+      "verificationCriteria": "run_auto_pipeline 호출 시 status_callback을 전달하면 각 단계별로 콜백이 호출되고, 진행률이 0에서 100까지 순차적으로 증가해야 합니다.",
+      "analysisResult": "텔레그램 봇이 자동 입찰 진행 상황을 실시간으로 정확하게 추적하도록 콜백 메커니즘을 구현합니다. 현재 시간 기반 진행률 표시를 실제 작업 상태와 동기화하여 사용자에게 정확한 정보를 제공합니다.",
+      "summary": "auto_bidding.py의 run_auto_pipeline 메서드에 status_callback 파라미터를 성공적으로 추가했습니다. 각 주요 단계(초기화, 로그인 확인, 링크 추출, 스크래핑, 가격 계산, 입찰, 완료/오류)에서 적절한 콜백을 호출하도록 구현했습니다.",
+      "completedAt": "2025-06-19T21:17:51.469Z"
+    },
+    {
+      "id": "cfd34ef6-bcb4-4abd-8cbe-b8da0035857f",
+      "name": "poison_integrated_bidding 모듈에 콜백 전파",
+      "description": "poison_integrated_bidding.py의 AutoBiddingAdapter.run_with_poison 메서드에도 콜백을 전파하여 입찰 진행 상황을 상세하게 추적합니다.",
+      "notes": "auto_bidding에서 전달받은 콜백을 그대로 사용하여 일관성을 유지합니다.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "427f5c97-5d5c-4f1a-9bde-b68edb0fba0b"
+        },
+        {
+          "taskId": "01ff227d-a26e-4f27-83cc-2f96d7c6570f"
+        }
+      ],
+      "createdAt": "2025-06-19T21:09:34.946Z",
+      "updatedAt": "2025-06-19T21:20:12.342Z",
+      "relatedFiles": [
+        {
+          "path": "poison_integrated_bidding.py",
+          "type": "TO_MODIFY",
+          "description": "run_with_poison 메서드 수정"
+        },
+        {
+          "path": "status_constants.py",
+          "type": "DEPENDENCY",
+          "description": "상태 코드 임포트"
+        }
+      ],
+      "implementationGuide": "run_with_poison 메서드에 status_callback 파라미터를 추가하고, 포이즌 입찰 진행 중 상태를 전달합니다. 각 아이템 입찰 시 진행률을 업데이트합니다.",
+      "verificationCriteria": "포이즌 입찰 진행 시 각 아이템별로 진행 상황이 콜백을 통해 전달되어야 합니다.",
+      "analysisResult": "텔레그램 봇이 자동 입찰 진행 상황을 실시간으로 정확하게 추적하도록 콜백 메커니즘을 구현합니다. 현재 시간 기반 진행률 표시를 실제 작업 상태와 동기화하여 사용자에게 정확한 정보를 제공합니다.",
+      "summary": "poison_integrated_bidding.py의 AutoBiddingAdapter.run_with_poison 메서드에 status_callback 파라미터를 성공적으로 추가했습니다. 입찰 시작, 진행, 완료 및 오류 발생 시 적절한 콜백을 호출하여 상세한 진행 상황을 추적할 수 있게 되었습니다.",
+      "completedAt": "2025-06-19T21:20:12.341Z"
+    },
+    {
+      "id": "b5449c95-c636-48ab-95f1-a27709d772ee",
+      "name": "텔레그램 봇 콜백 처리 구현",
+      "description": "telegram_bot.py의 _run_auto_bidding 메서드를 수정하여 실제 콜백을 처리하고 텔레그램 메시지로 전송하도록 구현합니다.",
+      "notes": "텔레그램 API 호출 제한(초당 30회)을 고려하여 메시지 전송 빈도를 조절해야 합니다.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "427f5c97-5d5c-4f1a-9bde-b68edb0fba0b"
+        },
+        {
+          "taskId": "01ff227d-a26e-4f27-83cc-2f96d7c6570f"
+        }
+      ],
+      "createdAt": "2025-06-19T21:09:34.946Z",
+      "updatedAt": "2025-06-19T21:22:37.156Z",
+      "relatedFiles": [
+        {
+          "path": "telegram_bot.py",
+          "type": "TO_MODIFY",
+          "description": "_run_auto_bidding 메서드 전면 수정"
+        },
+        {
+          "path": "status_constants.py",
+          "type": "DEPENDENCY",
+          "description": "상태 코드와 이모지 임포트"
+        }
+      ],
+      "implementationGuide": "시간 기반 시뮬레이션 코드를 제거하고, auto_bidding.run_auto_pipeline 호출 시 콜백 함수를 전달합니다. asyncio와 threading 간 통신을 위해 queue.Queue를 사용하여 콜백 데이터를 전달하고, 별도의 asyncio 태스크에서 큐를 모니터링하여 텔레그램 메시지를 전송합니다.",
+      "verificationCriteria": "자동 입찰 실행 시 텔레그램에 실제 작업 진행 상황이 실시간으로 표시되고, 각 단계별로 적절한 이모지와 프로그레스 바가 표시되어야 합니다.",
+      "analysisResult": "텔레그램 봇이 자동 입찰 진행 상황을 실시간으로 정확하게 추적하도록 콜백 메커니즘을 구현합니다. 현재 시간 기반 진행률 표시를 실제 작업 상태와 동기화하여 사용자에게 정확한 정보를 제공합니다.",
+      "summary": "telegram_bot.py의 _run_auto_bidding 메서드를 성공적으로 수정했습니다. 시간 기반 시뮬레이션을 제거하고 실제 콜백을 처리하는 시스템을 구현했습니다. queue.Queue를 사용하여 asyncio와 threading 간 통신을 구현하고, 텔레그램 API 제한을 고려한 메시지 전송 빈도 조절도 구현했습니다.",
+      "completedAt": "2025-06-19T21:22:37.156Z"
+    },
+    {
+      "id": "0f47a5f3-c230-42af-95c0-7b7b7dc3e13a",
+      "name": "통합 테스트 및 오류 처리 검증",
+      "description": "전체 시스템이 올바르게 동작하는지 테스트하고, 오류 발생 시 적절한 상태 전달이 이루어지는지 검증합니다.",
+      "notes": "네트워크 오류, 입찰 실패 등 다양한 오류 시나리오를 테스트해야 합니다.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "427f5c97-5d5c-4f1a-9bde-b68edb0fba0b"
+        },
+        {
+          "taskId": "01ff227d-a26e-4f27-83cc-2f96d7c6570f"
+        },
+        {
+          "taskId": "cfd34ef6-bcb4-4abd-8cbe-b8da0035857f"
+        },
+        {
+          "taskId": "b5449c95-c636-48ab-95f1-a27709d772ee"
+        }
+      ],
+      "createdAt": "2025-06-19T21:09:34.946Z",
+      "updatedAt": "2025-06-19T21:28:46.089Z",
+      "relatedFiles": [
+        {
+          "path": "test_telegram_status.py",
+          "type": "CREATE",
+          "description": "새로운 테스트 파일 생성"
+        }
+      ],
+      "implementationGuide": "test_telegram_status.py 테스트 파일을 생성하여 각 상태 전환과 콜백 호출을 검증합니다. 또한 실제 텔레그램 봇을 실행하여 end-to-end 테스트를 수행합니다.",
+      "verificationCriteria": "모든 테스트가 통과하고, 실제 텔레그램 봇 실행 시 각 단계별 상태가 정확히 표시되며, 오류 발생 시에도 적절한 메시지가 전달되어야 합니다.",
+      "analysisResult": "텔레그램 봇이 자동 입찰 진행 상황을 실시간으로 정확하게 추적하도록 콜백 메커니즘을 구현합니다. 현재 시간 기반 진행률 표시를 실제 작업 상태와 동기화하여 사용자에게 정확한 정보를 제공합니다.",
+      "summary": "통합 테스트가 성공적으로 완료되었습니다. 모든 테스트 케이스가 통과했으며, 상태 추적 시스템, 콜백 메커니즘, 프로그레스 바 생성, 오류 처리 등 주요 기능이 정상 작동합니다.",
+      "completedAt": "2025-06-19T21:28:46.088Z"
+    }
+  ]
+}

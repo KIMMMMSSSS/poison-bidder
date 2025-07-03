@@ -1,0 +1,112 @@
+{
+  "tasks": [
+    {
+      "id": "5ed7ec3d-8ee4-4f16-bfe4-53012cb6645c",
+      "name": "BaseScraper 추상 클래스 생성",
+      "description": "모든 사이트 스크래퍼의 공통 인터페이스를 정의하는 추상 베이스 클래스 생성. extract_brand(), extract_product_name_and_color(), extract_product_code(), extract_sizes_and_prices() 등의 추상 메서드 정의",
+      "notes": "기존 MusinsaWorker의 공통 로직을 분석하여 재사용 가능한 부분 식별",
+      "status": "completed",
+      "dependencies": [],
+      "createdAt": "2025-06-16T23:10:40.202Z",
+      "updatedAt": "2025-06-16T23:15:48.406Z",
+      "relatedFiles": [
+        {
+          "path": "C:\\poison_final\\base_scraper.py",
+          "type": "CREATE",
+          "description": "추상 베이스 클래스 파일"
+        }
+      ],
+      "implementationGuide": "base_scraper.py 파일을 생성하여 ABC 모듈을 사용한 추상 클래스 구현. 각 메서드는 @abstractmethod 데코레이터 사용. 공통 유틸리티 메서드(드라이버 초기화, 페이지 로드 대기 등)도 포함",
+      "verificationCriteria": "BaseScraper 클래스가 생성되고 모든 필수 추상 메서드가 정의되어 있으며, 상속 테스트를 통해 정상 작동 확인",
+      "analysisResult": "무신사 스크래퍼를 ABC-Mart 사이트까지 지원하도록 확장하여 멀티 사이트 지원 구조로 리팩토링. Python + Selenium 기반 멀티프로세스 Worker 패턴을 유지하면서 추상화를 통한 확장 가능한 구조 구현",
+      "summary": "BaseScraper 추상 클래스를 성공적으로 생성. ABC 모듈을 사용한 추상 메서드 정의, 공통 드라이버 설정 로직, 쿠키 로드, 스크래핑 플로우 등 모든 필수 기능 구현 완료. Git 커밋 완료.",
+      "completedAt": "2025-06-16T23:15:48.401Z"
+    },
+    {
+      "id": "885ddd2e-2a1e-4879-b199-923f5560b23c",
+      "name": "MusinsaScraper 클래스 구현",
+      "description": "기존 MusinsaWorker의 로직을 BaseScraper를 상속하는 MusinsaScraper 클래스로 마이그레이션. 무신사 특화 스크래핑 로직 구현",
+      "notes": "기존 코드의 동작을 그대로 유지하면서 구조만 변경",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "5ed7ec3d-8ee4-4f16-bfe4-53012cb6645c"
+        }
+      ],
+      "createdAt": "2025-06-16T23:10:40.202Z",
+      "updatedAt": "2025-06-16T23:20:42.821Z",
+      "relatedFiles": [
+        {
+          "path": "C:\\poison_final\\site_scrapers\\musinsa_scraper.py",
+          "type": "CREATE",
+          "description": "무신사 스크래퍼 구현 파일"
+        },
+        {
+          "path": "C:\\poison_final\\musinsa_scraper.py",
+          "type": "REFERENCE",
+          "description": "기존 무신사 스크래퍼 코드 참조"
+        }
+      ],
+      "implementationGuide": "site_scrapers/musinsa_scraper.py 파일 생성. 기존 MusinsaWorker의 스크래핑 메서드들을 BaseScraper 인터페이스에 맞게 재구성. 무신사 특화 셀렉터와 로직 유지",
+      "verificationCriteria": "MusinsaScraper가 BaseScraper를 올바르게 상속하고, 기존 무신사 URL로 테스트 시 동일한 결과 출력",
+      "analysisResult": "무신사 스크래퍼를 ABC-Mart 사이트까지 지원하도록 확장하여 멀티 사이트 지원 구조로 리팩토링. Python + Selenium 기반 멀티프로세스 Worker 패턴을 유지하면서 추상화를 통한 확장 가능한 구조 구현",
+      "summary": "MusinsaScraper 클래스를 성공적으로 구현. BaseScraper를 상속받아 모든 추상 메서드 구현 완료. 기존 무신사 로직을 그대로 유지하면서 인터페이스만 맞춤. site_scrapers 패키지 생성 및 Git 커밋 완료.",
+      "completedAt": "2025-06-16T23:20:42.821Z"
+    },
+    {
+      "id": "c5fa606b-2103-4263-83c8-9c22459c1f08",
+      "name": "ABCMartScraper 클래스 구현",
+      "description": "ABC-Mart 사이트 전용 스크래퍼 구현. 상품명, 스타일코드, 가격, 회원 최대혜택가, 사이즈 및 재고 정보 추출",
+      "notes": "JavaScript 실행으로 툴팁 클릭 필요. 사이즈는 ul.size-list li[data-product-type=\\\"option\\\"]에서 data-product-option-quantity로 재고 확인",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "5ed7ec3d-8ee4-4f16-bfe4-53012cb6645c"
+        }
+      ],
+      "createdAt": "2025-06-16T23:10:40.202Z",
+      "updatedAt": "2025-06-16T23:26:49.493Z",
+      "relatedFiles": [
+        {
+          "path": "C:\\poison_final\\site_scrapers\\abcmart_scraper.py",
+          "type": "CREATE",
+          "description": "ABC-Mart 스크래퍼 구현 파일"
+        }
+      ],
+      "implementationGuide": "site_scrapers/abcmart_scraper.py 파일 생성. 셀렉터: 상품명 .prod-name[data-product=\\\"korean-name\\\"], 스타일코드 li[data-product=\\\"style-code\\\"], 가격 span.price-cost[data-product=\\\"sell-price-amount\\\"]. 회원 최대혜택가는 span.icon-tooltip.discount-info 클릭 후 추출",
+      "verificationCriteria": "ABC-Mart URL로 테스트 시 상품 정보가 올바르게 추출되고 bid.txt 형식으로 출력",
+      "analysisResult": "무신사 스크래퍼를 ABC-Mart 사이트까지 지원하도록 확장하여 멀티 사이트 지원 구조로 리팩토링. Python + Selenium 기반 멀티프로세스 Worker 패턴을 유지하면서 추상화를 통한 확장 가능한 구조 구현",
+      "summary": "ABCMartScraper 클래스를 성공적으로 구현. BaseScraper를 상속받아 모든 추상 메서드 구현 완료. 색상 코드를 스타일코드에 결합하는 특수 처리 구현 (스타일코드-색상코드 형식). 회원 최대혜택가 툴팁 클릭 처리, 사이즈별 재고 확인 로직 포함. Git 커밋 완료.",
+      "completedAt": "2025-06-16T23:26:49.492Z"
+    },
+    {
+      "id": "a774939a-f0d1-4a29-8e2b-b5194bd26b66",
+      "name": "MultiSiteScraper 라우터 구현",
+      "description": "URL 도메인을 기반으로 적절한 스크래퍼를 선택하고 실행하는 라우터 클래스 구현",
+      "notes": "확장 가능한 구조로 설계하여 향후 새로운 사이트 추가 용이",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "885ddd2e-2a1e-4879-b199-923f5560b23c"
+        },
+        {
+          "taskId": "c5fa606b-2103-4263-83c8-9c22459c1f08"
+        }
+      ],
+      "createdAt": "2025-06-16T23:10:40.202Z",
+      "updatedAt": "2025-06-16T23:29:07.746Z",
+      "relatedFiles": [
+        {
+          "path": "C:\\poison_final\\multi_site_scraper.py",
+          "type": "CREATE",
+          "description": "멀티사이트 라우터 파일"
+        }
+      ],
+      "implementationGuide": "multi_site_scraper.py 파일 생성. urlparse로 도메인 추출, scrapers 딕셔너리로 사이트별 스크래퍼 매핑. get_scraper() 메서드로 적절한 스크래퍼 인스턴스 반환",
+      "verificationCriteria": "무신사와 ABC-Mart URL 모두 올바른 스크래퍼로 라우팅되는지 확인",
+      "analysisResult": "무신사 스크래퍼를 ABC-Mart 사이트까지 지원하도록 확장하여 멀티 사이트 지원 구조로 리팩토링. Python + Selenium 기반 멀티프로세스 Worker 패턴을 유지하면서 추상화를 통한 확장 가능한 구조 구현",
+      "summary": "MultiSiteScraper 라우터 클래스를 성공적으로 구현. URL 도메인 기반 스크래퍼 자동 선택, 정규표현식 패턴 매칭 지원, 확장 가능한 레지스트리 구조, 배치 스크래핑 지원 메서드 포함. 테스트 코드와 함께 Git 커밋 완료.",
+      "completedAt": "2025-06-16T23:29:07.745Z"
+    }
+  ]
+}

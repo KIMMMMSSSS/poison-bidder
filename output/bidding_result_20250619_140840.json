@@ -1,0 +1,66 @@
+{
+  "links": [
+    "https://www.musinsa.com/products/1234567",
+    "https://www.musinsa.com/products/2345678"
+  ],
+  "items": [
+    {
+      "brand": "TEST_BRAND",
+      "code": "TEST_0001",
+      "color": "BLACK",
+      "size": "100",
+      "price": 50000,
+      "link": "https://www.musinsa.com/products/1234567",
+      "stock": true
+    },
+    {
+      "brand": "TEST_BRAND",
+      "code": "TEST_0002",
+      "color": "BLACK",
+      "size": "100",
+      "price": 60000,
+      "link": "https://www.musinsa.com/products/2345678",
+      "stock": true
+    }
+  ],
+  "adjusted_items": [
+    {
+      "brand": "TEST_BRAND",
+      "code": "TEST_0001",
+      "color": "BLACK",
+      "size": "100",
+      "price": 50000,
+      "link": "https://www.musinsa.com/products/1234567",
+      "stock": true,
+      "adjusted_price": 47025,
+      "discount_amount": 2975,
+      "discount_rate": 0.0595
+    },
+    {
+      "brand": "TEST_BRAND",
+      "code": "TEST_0002",
+      "color": "BLACK",
+      "size": "100",
+      "price": 60000,
+      "link": "https://www.musinsa.com/products/2345678",
+      "stock": true,
+      "adjusted_price": 56430,
+      "discount_amount": 3570,
+      "discount_rate": 0.0595
+    }
+  ],
+  "bid_results": [
+    {
+      "item_code": "TEST_0001",
+      "success": true,
+      "message": "테스트 입찰 성공",
+      "timestamp": "2025-06-19T14:08:40.752174"
+    },
+    {
+      "item_code": "TEST_0002",
+      "success": true,
+      "message": "테스트 입찰 성공",
+      "timestamp": "2025-06-19T14:08:40.752174"
+    }
+  ]
+}

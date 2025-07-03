@@ -1,0 +1,12 @@
+{
+    "bot": {
+        "token": "7893480674:AAFqVTZuX9ujNfMZh_JDV6QU-cIQVAaY5uY",
+        "admin_ids": [5018034019]
+    },
+    "messages": {
+        "unauthorized": "❌ 권한이 없습니다. 관리자에게 문의하세요.",
+        "task_running": "⏳ 이미 작업이 진행 중입니다.",
+        "welcome": "🤖 K-Fashion 자동 입찰 봇에 오신 것을 환영합니다!",
+        "error": "❌ 오류가 발생했습니다: {error}"
+    }
+}

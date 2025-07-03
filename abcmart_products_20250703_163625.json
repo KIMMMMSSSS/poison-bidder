@@ -1,0 +1,477 @@
+[
+  {
+    "url": "https://abcmart.a-rt.com/product?prdtNo=1010112379",
+    "brand": "아디다스",
+    "product_name": "",
+    "color": "",
+    "product_code": "JH6851",
+    "sizes_prices": [
+      {
+        "size": "225",
+        "price": 53000,
+        "delivery": "ABC마트배송"
+      },
+      {
+        "size": "230",
+        "price": 53000,
+        "delivery": "ABC마트배송"
+      },
+      {
+        "size": "235",
+        "price": 53000,
+        "delivery": "ABC마트배송"
+      },
+      {
+        "size": "240",
+        "price": 53000,
+        "delivery": "ABC마트배송"
+      },
+      {
+        "size": "245",
+        "price": 53000,
+        "delivery": "ABC마트배송"
+      },
+      {
+        "size": "250",
+        "price": 53000,
+        "delivery": "ABC마트배송"
+      }
+    ],
+    "scraped_at": "2025-07-03 16:36:12",
+    "worker_id": 1
+  },
+  {
+    "url": "https://abcmart.a-rt.com/product?prdtNo=1010096475",
+    "brand": "아디다스",
+    "product_name": "",
+    "color": "",
+    "product_code": "HQ8707",
+    "sizes_prices": [
+      {
+        "size": "225",
+        "price": 125100,
+        "delivery": "ABC마트배송"
+      },
+      {
+        "size": "230",
+        "price": 125100,
+        "delivery": "ABC마트배송"
+      },
+      {
+        "size": "235",
+        "price": 125100,
+        "delivery": "ABC마트배송"
+      },
+      {
+        "size": "240",
+        "price": 125100,
+        "delivery": "ABC마트배송"
+      },
+      {
+        "size": "245",
+        "price": 125100,
+        "delivery": "ABC마트배송"
+      },
+      {
+        "size": "250",
+        "price": 125100,
+        "delivery": "ABC마트배송"
+      },
+      {
+        "size": "255",
+        "price": 125100,
+        "delivery": "ABC마트배송"
+      },
+      {
+        "size": "260",
+        "price": 125100,
+        "delivery": "ABC마트배송"
+      },
+      {
+        "size": "265",
+        "price": 125100,
+        "delivery": "ABC마트배송"
+      },
+      {
+        "size": "270",
+        "price": 125100,
+        "delivery": "ABC마트배송"
+      },
+      {
+        "size": "275",
+        "price": 125100,
+        "delivery": "ABC마트배송"
+      },
+      {
+        "size": "280",
+        "price": 125100,
+        "delivery": "ABC마트배송"
+      },
+      {
+        "size": "290",
+        "price": 125100,
+        "delivery": "ABC마트배송"
+      },
+      {
+        "size": "220",
+        "price": 125100,
+        "delivery": "ABC마트배송"
+      }
+    ],
+    "scraped_at": "2025-07-03 16:36:13",
+    "worker_id": 3
+  },
+  {
+    "url": "https://abcmart.a-rt.com/product?prdtNo=1010113942",
+    "brand": "아디다스",
+    "product_name": "",
+    "color": "",
+    "product_code": "JQ7482",
+    "sizes_prices": [
+      {
+        "size": "230",
+        "price": 69000,
+        "delivery": "ABC마트배송"
+      },
+      {
+        "size": "235",
+        "price": 69000,
+        "delivery": "ABC마트배송"
+      },
+      {
+        "size": "240",
+        "price": 69000,
+        "delivery": "ABC마트배송"
+      },
+      {
+        "size": "245",
+        "price": 69000,
+        "delivery": "ABC마트배송"
+      },
+      {
+        "size": "250",
+        "price": 69000,
+        "delivery": "ABC마트배송"
+      },
+      {
+        "size": "255",
+        "price": 69000,
+        "delivery": "ABC마트배송"
+      },
+      {
+        "size": "260",
+        "price": 69000,
+        "delivery": "ABC마트배송"
+      },
+      {
+        "size": "265",
+        "price": 69000,
+        "delivery": "ABC마트배송"
+      },
+      {
+        "size": "270",
+        "price": 69000,
+        "delivery": "ABC마트배송"
+      },
+      {
+        "size": "275",
+        "price": 69000,
+        "delivery": "ABC마트배송"
+      },
+      {
+        "size": "280",
+        "price": 69000,
+        "delivery": "ABC마트배송"
+      },
+      {
+        "size": "290",
+        "price": 69000,
+        "delivery": "ABC마트배송"
+      },
+      {
+        "size": "300",
+        "price": 69000,
+        "delivery": "ABC마트배송"
+      }
+    ],
+    "scraped_at": "2025-07-03 16:36:14",
+    "worker_id": 4
+  },
+  {
+    "url": "https://abcmart.a-rt.com/product?prdtNo=1010110894",
+    "brand": "아디다스",
+    "product_name": "",
+    "color": "",
+    "product_code": "JR3249",
+    "sizes_prices": [
+      {
+        "size": "230",
+        "price": 71100,
+        "delivery": "ABC마트배송"
+      },
+      {
+        "size": "235",
+        "price": 71100,
+        "delivery": "ABC마트배송"
+      },
+      {
+        "size": "240",
+        "price": 71100,
+        "delivery": "ABC마트배송"
+      },
+      {
+        "size": "245",
+        "price": 71100,
+        "delivery": "ABC마트배송"
+      },
+      {
+        "size": "250",
+        "price": 71100,
+        "delivery": "ABC마트배송"
+      },
+      {
+        "size": "255",
+        "price": 71100,
+        "delivery": "ABC마트배송"
+      },
+      {
+        "size": "260",
+        "price": 71100,
+        "delivery": "ABC마트배송"
+      },
+      {
+        "size": "265",
+        "price": 71100,
+        "delivery": "ABC마트배송"
+      },
+      {
+        "size": "270",
+        "price": 71100,
+        "delivery": "ABC마트배송"
+      },
+      {
+        "size": "275",
+        "price": 71100,
+        "delivery": "ABC마트배송"
+      },
+      {
+        "size": "280",
+        "price": 71100,
+        "delivery": "ABC마트배송"
+      },
+      {
+        "size": "290",
+        "price": 71100,
+        "delivery": "ABC마트배송"
+      },
+      {
+        "size": "300",
+        "price": 71100,
+        "delivery": "ABC마트배송"
+      }
+    ],
+    "scraped_at": "2025-07-03 16:36:15",
+    "worker_id": 2
+  },
+  {
+    "url": "https://abcmart.a-rt.com/product?prdtNo=1010103561",
+    "brand": "아디다스",
+    "product_name": "",
+    "color": "",
+    "product_code": "ID0440",
+    "sizes_prices": [
+      {
+        "size": "220",
+        "price": 74000,
+        "delivery": "ABC마트배송"
+      },
+      {
+        "size": "225",
+        "price": 74000,
+        "delivery": "ABC마트배송"
+      },
+      {
+        "size": "230",
+        "price": 74000,
+        "delivery": "ABC마트배송"
+      },
+      {
+        "size": "235",
+        "price": 74000,
+        "delivery": "ABC마트배송"
+      },
+      {
+        "size": "240",
+        "price": 74000,
+        "delivery": "ABC마트배송"
+      },
+      {
+        "size": "245",
+        "price": 74000,
+        "delivery": "ABC마트배송"
+      },
+      {
+        "size": "250",
+        "price": 74000,
+        "delivery": "ABC마트배송"
+      },
+      {
+        "size": "260",
+        "price": 74000,
+        "delivery": "ABC마트배송"
+      },
+      {
+        "size": "280",
+        "price": 74000,
+        "delivery": "ABC마트배송"
+      }
+    ],
+    "scraped_at": "2025-07-03 16:36:17",
+    "worker_id": 5
+  },
+  {
+    "url": "https://abcmart.a-rt.com/product?prdtNo=1010113896",
+    "brand": "아디다스",
+    "product_name": "",
+    "color": "",
+    "product_code": "JI0461",
+    "sizes_prices": [
+      {
+        "size": "품절",
+        "price": 47000,
+        "delivery": "ABC마트배송"
+      }
+    ],
+    "scraped_at": "2025-07-03 16:36:20",
+    "worker_id": 1
+  },
+  {
+    "url": "https://abcmart.a-rt.com/product?prdtNo=1010111988",
+    "brand": "아디다스",
+    "product_name": "",
+    "color": "",
+    "product_code": "ID3814",
+    "sizes_prices": [
+      {
+        "size": "220",
+        "price": 29000,
+        "delivery": "ABC마트배송"
+      },
+      {
+        "size": "230",
+        "price": 29000,
+        "delivery": "ABC마트배송"
+      },
+      {
+        "size": "240",
+        "price": 29000,
+        "delivery": "ABC마트배송"
+      }
+    ],
+    "scraped_at": "2025-07-03 16:36:21",
+    "worker_id": 3
+  },
+  {
+    "url": "https://abcmart.a-rt.com/product?prdtNo=1010114557",
+    "brand": "아디다스",
+    "product_name": "",
+    "color": "",
+    "product_code": "JI2805",
+    "sizes_prices": [
+      {
+        "size": "품절",
+        "price": 35100,
+        "delivery": "ABC마트배송"
+      }
+    ],
+    "scraped_at": "2025-07-03 16:36:22",
+    "worker_id": 4
+  },
+  {
+    "url": "https://abcmart.a-rt.com/product?prdtNo=1010112078",
+    "brand": "아디다스",
+    "product_name": "",
+    "color": "",
+    "product_code": "JP5434",
+    "sizes_prices": [
+      {
+        "size": "235",
+        "price": 45100,
+        "delivery": "ABC마트배송"
+      },
+      {
+        "size": "245",
+        "price": 45100,
+        "delivery": "ABC마트배송"
+      },
+      {
+        "size": "255",
+        "price": 45100,
+        "delivery": "ABC마트배송"
+      },
+      {
+        "size": "265",
+        "price": 45100,
+        "delivery": "ABC마트배송"
+      },
+      {
+        "size": "275",
+        "price": 45100,
+        "delivery": "ABC마트배송"
+      },
+      {
+        "size": "285",
+        "price": 45100,
+        "delivery": "ABC마트배송"
+      },
+      {
+        "size": "295",
+        "price": 45100,
+        "delivery": "ABC마트배송"
+      },
+      {
+        "size": "305",
+        "price": 45100,
+        "delivery": "ABC마트배송"
+      }
+    ],
+    "scraped_at": "2025-07-03 16:36:24",
+    "worker_id": 2
+  },
+  {
+    "url": "https://abcmart.a-rt.com/product?prdtNo=1010112501",
+    "brand": "아디다스",
+    "product_name": "",
+    "color": "",
+    "product_code": "JH9976",
+    "sizes_prices": [
+      {
+        "size": "220",
+        "price": 95000,
+        "delivery": "ABC마트배송"
+      },
+      {
+        "size": "225",
+        "price": 95000,
+        "delivery": "ABC마트배송"
+      },
+      {
+        "size": "230",
+        "price": 95000,
+        "delivery": "ABC마트배송"
+      },
+      {
+        "size": "235",
+        "price": 95000,
+        "delivery": "ABC마트배송"
+      },
+      {
+        "size": "240",
+        "price": 95000,
+        "delivery": "ABC마트배송"
+      }
+    ],
+    "scraped_at": "2025-07-03 16:36:25",
+    "worker_id": 5
+  }
+]

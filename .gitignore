@@ -1,0 +1,53 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+VENV/
+
+# 환경 설정
+.env
+.env.local
+.env.*.local
+
+# 로그 파일
+logs/*.log
+logs/*.txt
+*.log
+
+# 데이터베이스
+db/*.db
+db/*.sqlite
+db/*.sqlite3
+*.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# 프로젝트 특정
+data/output/
+temp/
+cache/
+*.bak
+*.tmp
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+
+# pytest
+.pytest_cache/
+.coverage
+htmlcov/

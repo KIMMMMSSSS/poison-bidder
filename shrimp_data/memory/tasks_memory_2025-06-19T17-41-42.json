@@ -1,0 +1,102 @@
+{
+  "tasks": [
+    {
+      "id": "e3bd48d1-9aa6-48a0-aa48-5d6723585cae",
+      "name": "로그인 계정 정보 상수 추가",
+      "description": "poison_bidder_wrapper_v2.py 파일 상단에 poison_direct_login.py에서 사용하는 로그인 계정 정보(전화번호, 비밀번호)를 상수로 추가합니다.",
+      "notes": "보안상 민감한 정보이므로 향후 환경변수나 설정 파일로 분리 고려",
+      "status": "completed",
+      "dependencies": [],
+      "createdAt": "2025-06-19T16:48:49.444Z",
+      "updatedAt": "2025-06-19T16:52:38.456Z",
+      "relatedFiles": [
+        {
+          "path": "C:/poison_final/poison_bidder_wrapper_v2.py",
+          "type": "TO_MODIFY",
+          "description": "상수 추가할 메인 파일",
+          "lineStart": 50,
+          "lineEnd": 60
+        },
+        {
+          "path": "C:/poison_final/poison_direct_login.py",
+          "type": "REFERENCE",
+          "description": "계정 정보 참조"
+        }
+      ],
+      "implementationGuide": "1. poison_bidder_wrapper_v2.py 파일의 다른 상수들이 정의된 부분 찾기\n2. PHONE_NUMBER = \"1099209275\"\n3. PASSWORD = \"99006622kK\"\n4. 주석으로 용도 명시",
+      "verificationCriteria": "1. PHONE_NUMBER와 PASSWORD 상수가 정의되었는지 확인\n2. 값이 poison_direct_login.py와 동일한지 확인\n3. 적절한 위치에 추가되었는지 확인",
+      "analysisResult": "poison_direct_login.py의 자동 로그인 로직을 poison_bidder_wrapper_v2.py의 첫 번째 워커에 통합하여 수동 로그인 대기를 자동 로그인으로 교체. 기존 쿠키 저장/공유 메커니즘과 0923_fixed_multiprocess_cookie_v2.py와의 연동 구조 유지",
+      "summary": "로그인 계정 정보 상수(PHONE_NUMBER, PASSWORD)가 poison_bidder_wrapper_v2.py에 성공적으로 추가되었으며, Git 커밋까지 완료됨",
+      "completedAt": "2025-06-19T16:52:38.456Z"
+    },
+    {
+      "id": "d1aa738d-c12c-4823-ad62-dca2af693865",
+      "name": "첫 번째 워커 자동 로그인 구현",
+      "description": "worker_process_wrapper 함수에서 첫 번째 워커(worker_id == 1)의 수동 로그인 대기 부분을 poison_direct_login.py의 자동 로그인 로직으로 교체합니다.",
+      "notes": "selenium.webdriver.common.action_chains 임포트 필요할 수 있음",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "e3bd48d1-9aa6-48a0-aa48-5d6723585cae"
+        }
+      ],
+      "createdAt": "2025-06-19T16:48:49.444Z",
+      "updatedAt": "2025-06-19T16:55:31.959Z",
+      "relatedFiles": [
+        {
+          "path": "C:/poison_final/poison_bidder_wrapper_v2.py",
+          "type": "TO_MODIFY",
+          "description": "수정할 메인 파일",
+          "lineStart": 250,
+          "lineEnd": 293
+        },
+        {
+          "path": "C:/poison_final/poison_direct_login.py",
+          "type": "REFERENCE",
+          "description": "로그인 로직 참조",
+          "lineStart": 50,
+          "lineEnd": 150
+        }
+      ],
+      "implementationGuide": "1. 250-293줄의 수동 로그인 대기 코드를 자동 로그인으로 변경\n2. 로그인 페이지 접속 후 자동으로 폼 입력\n3. 전화번호 입력: mobile_number ID 사용\n4. 국가코드 South Korea 선택: JavaScript 실행\n5. 비밀번호 입력: password ID 사용\n6. 로그인 버튼 클릭\n7. 기존 로그인 성공 체크 로직은 유지",
+      "verificationCriteria": "1. 자동으로 로그인 폼이 입력되는지 확인\n2. 국가 코드가 South Korea로 선택되는지 확인\n3. 로그인 버튼이 자동으로 클릭되는지 확인\n4. 로그인 실패 시 적절한 에러 메시지 출력\n5. 쿠키 저장 로직이 정상 작동하는지 확인",
+      "analysisResult": "poison_direct_login.py의 자동 로그인 로직을 poison_bidder_wrapper_v2.py의 첫 번째 워커에 통합하여 수동 로그인 대기를 자동 로그인으로 교체. 기존 쿠키 저장/공유 메커니즘과 0923_fixed_multiprocess_cookie_v2.py와의 연동 구조 유지",
+      "summary": "첫 번째 워커의 수동 로그인 대기 코드를 자동 로그인으로 성공적으로 교체. Keys와 ActionChains 임포트 추가, poison_direct_login.py의 로직 적용 완료",
+      "completedAt": "2025-06-19T16:55:31.958Z"
+    },
+    {
+      "id": "426e6248-80e3-4005-86a5-916ba9e4a621",
+      "name": "자동 로그인 테스트",
+      "description": "수정된 poison_bidder_wrapper_v2.py의 자동 로그인 기능이 정상적으로 작동하는지 테스트합니다.",
+      "notes": "실제 포이즌 계정으로 테스트하므로 주의 필요",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "e3bd48d1-9aa6-48a0-aa48-5d6723585cae"
+        },
+        {
+          "taskId": "d1aa738d-c12c-4823-ad62-dca2af693865"
+        }
+      ],
+      "createdAt": "2025-06-19T16:48:49.444Z",
+      "updatedAt": "2025-06-19T16:57:37.491Z",
+      "relatedFiles": [
+        {
+          "path": "C:/poison_final/poison_bidder_wrapper_v2.py",
+          "type": "REFERENCE",
+          "description": "테스트할 파일"
+        },
+        {
+          "path": "C:/poison_final/logs/poison_bidder_wrapper_20250620.log",
+          "type": "REFERENCE",
+          "description": "로그 확인"
+        }
+      ],
+      "implementationGuide": "1. python poison_bidder_wrapper_v2.py 실행\n2. 첫 번째 워커가 자동으로 로그인하는지 확인\n3. 로그인 성공 후 쿠키가 저장되는지 확인\n4. 다른 워커들이 쿠키를 로드하는지 확인\n5. 전체 입찰 프로세스가 정상 작동하는지 확인",
+      "verificationCriteria": "1. 자동 로그인이 성공적으로 완료되는지 확인\n2. 로그에 '로그인 성공' 메시지가 출력되는지 확인\n3. poizon_cookies.pkl 파일이 생성/업데이트되는지 확인\n4. 에러 없이 입찰 프로세스가 시작되는지 확인",
+      "analysisResult": "poison_direct_login.py의 자동 로그인 로직을 poison_bidder_wrapper_v2.py의 첫 번째 워커에 통합하여 수동 로그인 대기를 자동 로그인으로 교체. 기존 쿠키 저장/공유 메커니즘과 0923_fixed_multiprocess_cookie_v2.py와의 연동 구조 유지",
+      "summary": "자동 로그인 기능이 완벽하게 작동함. 첫 번째 워커가 자동으로 로그인하고 쿠키를 저장했으며, 두 번째 워커는 쿠키를 성공적으로 로드함",
+      "completedAt": "2025-06-19T16:57:37.453Z"
+    }
+  ]
+}

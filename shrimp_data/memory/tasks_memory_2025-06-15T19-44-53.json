@@ -1,0 +1,102 @@
+{
+  "tasks": [
+    {
+      "id": "b9785c45-5ab2-4aba-b19c-eb959395d59c",
+      "name": "HTML 구조 변경 사항 확인 및 문서화",
+      "description": "무신사 웹사이트의 새로운 HTML 구조를 분석하고 변경 사항을 문서화합니다. StaticDropdownMenuItem 내부의 span 태그 구조와 배송 타입 표시 방식을 확인합니다.",
+      "notes": "HTML 구조 분석 시 브라우저 개발자 도구 활용 가능",
+      "status": "completed",
+      "dependencies": [],
+      "createdAt": "2025-06-15T18:23:14.782Z",
+      "updatedAt": "2025-06-15T18:25:20.361Z",
+      "relatedFiles": [
+        {
+          "path": "C:\\poison_final\\musinsa_scraper_backup3.py",
+          "type": "REFERENCE",
+          "description": "기존 스크래퍼 코드"
+        }
+      ],
+      "implementationGuide": "1. musinsa_scraper_backup3.py 파일의 현재 JavaScript 코드 확인\n2. 붙여넣은 HTML 구조와 비교 분석\n3. div.flex-col 구조 내 span 태그 계층 파악\n4. 배송 타입 텍스트 위치 확인 (브랜드 배송, 무신사 직배송)\n5. 재고 정보 표시 위치 확인 (sc-12bm00o-1 클래스)",
+      "verificationCriteria": "1. HTML 구조 변경 사항이 명확히 파악됨\n2. span 태그 계층 구조가 문서화됨\n3. 배송 타입과 재고 정보 위치가 확인됨",
+      "analysisResult": "무신사 스크래퍼의 사이즈 인식 문제 해결. HTML 구조가 p 태그에서 span 태그로 변경되어 JavaScript 코드 수정 필요. 브랜드 배송 제외하고 무신사 직배송만 추출.",
+      "summary": "HTML 구조 변경 사항을 성공적으로 분석하고 문서화함. p 태그에서 span 태그 중첩 구조로의 변경, 배송 타입 구분 방법, 재고 정보 위치 등을 명확히 파악하여 상세한 문서로 작성함.",
+      "completedAt": "2025-06-15T18:25:20.360Z"
+    },
+    {
+      "id": "51069c2d-3b1b-43a0-a092-f2714e2f345e",
+      "name": "JavaScript 사이즈 추출 코드 수정",
+      "description": "extract_sizes_and_prices 함수 내 JavaScript 코드를 수정하여 새로운 span 기반 HTML 구조에서 사이즈 정보를 올바르게 추출하도록 합니다.",
+      "notes": "shrimp-rules.md의 JavaScript 우선 실행 원칙 준수",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "b9785c45-5ab2-4aba-b19c-eb959395d59c"
+        }
+      ],
+      "createdAt": "2025-06-15T18:23:14.782Z",
+      "updatedAt": "2025-06-15T18:29:19.706Z",
+      "relatedFiles": [
+        {
+          "path": "C:\\poison_final\\musinsa_scraper_backup3.py",
+          "type": "TO_MODIFY",
+          "description": "JavaScript 코드 수정 대상",
+          "lineStart": 403,
+          "lineEnd": 476
+        }
+      ],
+      "implementationGuide": "1. 403-476 라인의 JavaScript 코드 수정\n2. p 태그 대신 div.flex-col과 span 태그 사용\n3. 배송 타입 확인 로직 구현 (브랜드 배송 제외)\n4. 재고 필터링 로직 유지 (4개 이하 제외)\n5. 에러 처리 및 폴백 메커니즘 포함",
+      "verificationCriteria": "1. span 태그에서 사이즈 정보가 올바르게 추출됨\n2. 브랜드 배송 상품이 제외됨\n3. 무신사 직배송만 포함됨\n4. 재고 4개 이하 상품이 필터링됨\n5. 에러 발생 시 폴백 로직이 작동함",
+      "analysisResult": "무신사 스크래퍼의 사이즈 인식 문제 해결. HTML 구조가 p 태그에서 span 태그로 변경되어 JavaScript 코드 수정 필요. 브랜드 배송 제외하고 무신사 직배송만 추출.",
+      "summary": "JavaScript 사이즈 추출 코드를 성공적으로 수정함. p 태그 대신 span 태그 기반 새로운 HTML 구조를 지원하도록 변경하고, 브랜드 배송 필터링 로직 구현, 재고 정보 추출 위치 변경, 에러 처리 및 폴백 메커니즘 포함.",
+      "completedAt": "2025-06-15T18:29:19.679Z"
+    },
+    {
+      "id": "2be61a5e-a0a6-46f3-bf20-376f536ee337",
+      "name": "다중 드롭다운 처리 로직 구현",
+      "description": "색상과 사이즈 두 개의 드롭다운이 있는 경우를 처리. 색상 드롭다운을 먼저 선택한 후 사이즈 드롭다운을 열어야 함.",
+      "notes": "드롭다운 state가 open/closed로 변경됨",
+      "status": "completed",
+      "dependencies": [],
+      "createdAt": "2025-06-15T18:33:15.177Z",
+      "updatedAt": "2025-06-15T18:36:42.582Z",
+      "relatedFiles": [
+        {
+          "path": "C:\\poison_final\\musinsa_scraper_backup3.py",
+          "type": "TO_MODIFY",
+          "description": "드롭다운 처리 로직 수정",
+          "lineStart": 387,
+          "lineEnd": 401
+        }
+      ],
+      "implementationGuide": "1. 모든 드롭다운 찾기 (placeholder 속성으로 구분)\n2. 색상 드롭다운이 있는 경우 첫 번째 색상 선택\n3. 사이즈 드롭다운 열기 (마지막 드롭다운)\n4. JavaScript 코드에서도 StaticDropdownMenuItem이 색상인지 사이즈인지 구분\n5. 색상 드롭다운: placeholder=\"컬러\"\n6. 사이즈 드롭다운: placeholder=\"사이즈\"",
+      "verificationCriteria": "1. 색상 드롭다운이 있을 때 첫 번째 색상이 선택됨\n2. 사이즈 드롭다운이 정확히 열림\n3. 색상 정보가 사이즈로 오인되지 않음\n4. 단일 드롭다운(사이즈만) 상품도 정상 작동",
+      "analysisResult": "무신사 스크래퍼의 사이즈 인식 문제 해결. HTML 구조가 p 태그에서 span 태그로 변경되어 JavaScript 코드 수정 필요. 브랜드 배송 제외하고 무신사 직배송만 추출.",
+      "summary": "다중 드롭다운 처리 로직을 성공적으로 구현함. 색상과 사이즈 드롭다운을 placeholder로 구분하고, 색상 선택 후 사이즈 드롭다운을 열도록 수정. JavaScript에서도 색상 항목(영문자+언더스코어)을 필터링하여 사이즈로 오인하지 않도록 처리.",
+      "completedAt": "2025-06-15T18:36:42.581Z"
+    },
+    {
+      "id": "d0e35c90-0e7a-4fa7-b02e-91ee8702ca2b",
+      "name": "다중 품번 처리 로직 구현",
+      "description": "품번이 쉼표로 구분되어 여러 개인 경우(예: 1027425,1027428) 각 품번별로 모든 사이즈를 입찰 파일에 작성하도록 수정",
+      "notes": "품번이 '1027425,1027428'인 경우 각각 따로 처리",
+      "status": "completed",
+      "dependencies": [],
+      "createdAt": "2025-06-15T18:42:08.820Z",
+      "updatedAt": "2025-06-15T18:45:23.948Z",
+      "relatedFiles": [
+        {
+          "path": "C:\\poison_final\\musinsa_scraper_backup3.py",
+          "type": "TO_MODIFY",
+          "description": "입찰 파일 생성 로직 수정",
+          "lineStart": 795,
+          "lineEnd": 825
+        }
+      ],
+      "implementationGuide": "1. extract_product_code 함수는 그대로 유지 (쉼표 포함한 전체 반환)\n2. 입찰 파일 생성 시 품번을 쉼표로 split\n3. 각 품번에 대해 모든 사이즈 반복 작성\n4. 예시: 품번 2개, 사이즈 5개인 경우 총 10개 라인 생성",
+      "verificationCriteria": "1. 쉼표로 구분된 품번이 각각 분리됨\n2. 각 품번에 대해 모든 사이즈가 작성됨\n3. 단일 품번도 정상 작동\n4. Total 개수가 올바르게 계산됨",
+      "analysisResult": "무신사 스크래퍼의 사이즈 인식 문제 해결. HTML 구조가 p 태그에서 span 태그로 변경되어 JavaScript 코드 수정 필요. 브랜드 배송 제외하고 무신사 직배송만 추출.",
+      "summary": "다중 품번 처리 로직을 성공적으로 구현함. 품번이 쉼표로 구분된 경우(예: 1027425,1027428) 각 품번별로 모든 사이즈를 입찰 파일에 작성하도록 수정. 품번 2개, 사이즈 5개인 경우 총 10개 라인이 생성됨.",
+      "completedAt": "2025-06-15T18:45:23.939Z"
+    }
+  ]
+}

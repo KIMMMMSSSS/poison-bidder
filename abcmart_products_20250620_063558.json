@@ -1,0 +1,557 @@
+[
+  {
+    "url": "https://abcmart.a-rt.com/product?prdtNo=1010102369",
+    "brand": "아식스",
+    "product_name": "",
+    "color": "",
+    "product_code": "1291A041",
+    "sizes_prices": [
+      {
+        "size": "품절",
+        "price": 62000,
+        "delivery": "ABC마트배송"
+      }
+    ],
+    "scraped_at": "2025-06-20 06:34:20",
+    "worker_id": 1
+  },
+  {
+    "url": "https://abcmart.a-rt.com/product?prdtNo=1010105202",
+    "brand": "아식스",
+    "product_name": "",
+    "color": "",
+    "product_code": "1291A056",
+    "sizes_prices": [
+      {
+        "size": "품절",
+        "price": 103000,
+        "delivery": "ABC마트배송"
+      }
+    ],
+    "scraped_at": "2025-06-20 06:34:23",
+    "worker_id": 5
+  },
+  {
+    "url": "https://abcmart.a-rt.com/product?prdtNo=1010105063",
+    "brand": "아식스",
+    "product_name": "",
+    "color": "",
+    "product_code": "1144A325",
+    "sizes_prices": [
+      {
+        "size": "품절",
+        "price": 69000,
+        "delivery": "ABC마트배송"
+      }
+    ],
+    "scraped_at": "2025-06-20 06:34:34",
+    "worker_id": 4
+  },
+  {
+    "url": "https://abcmart.a-rt.com/product?prdtNo=1010102374",
+    "brand": "아식스",
+    "product_name": "",
+    "color": "",
+    "product_code": "FLC101",
+    "sizes_prices": [
+      {
+        "size": "품절",
+        "price": 79000,
+        "delivery": "ABC마트배송"
+      }
+    ],
+    "scraped_at": "2025-06-20 06:34:34",
+    "worker_id": 2
+  },
+  {
+    "url": "https://abcmart.a-rt.com/product?prdtNo=1010108334",
+    "brand": "아식스",
+    "product_name": "",
+    "color": "",
+    "product_code": "1203A275",
+    "sizes_prices": [
+      {
+        "size": "품절",
+        "price": 139000,
+        "delivery": "ABC마트배송"
+      }
+    ],
+    "scraped_at": "2025-06-20 06:34:35",
+    "worker_id": 3
+  },
+  {
+    "url": "https://abcmart.a-rt.com/product?prdtNo=1010094262",
+    "brand": "아식스",
+    "product_name": "",
+    "color": "",
+    "product_code": "1202A164",
+    "sizes_prices": [
+      {
+        "size": "품절",
+        "price": 39000,
+        "delivery": "ABC마트배송"
+      }
+    ],
+    "scraped_at": "2025-06-20 06:34:47",
+    "worker_id": 4
+  },
+  {
+    "url": "https://abcmart.a-rt.com/product?prdtNo=1010102373",
+    "brand": "아식스",
+    "product_name": "",
+    "color": "",
+    "product_code": "1293A032",
+    "sizes_prices": [
+      {
+        "size": "품절",
+        "price": 87000,
+        "delivery": "ABC마트배송"
+      }
+    ],
+    "scraped_at": "2025-06-20 06:34:49",
+    "worker_id": 3
+  },
+  {
+    "url": "https://abcmart.a-rt.com/product?prdtNo=1010105068",
+    "brand": "아식스",
+    "product_name": "",
+    "color": "",
+    "product_code": "1291A056",
+    "sizes_prices": [
+      {
+        "size": "품절",
+        "price": 103000,
+        "delivery": "ABC마트배송"
+      }
+    ],
+    "scraped_at": "2025-06-20 06:34:49",
+    "worker_id": 2
+  },
+  {
+    "url": "https://abcmart.a-rt.com/product?prdtNo=1010108420",
+    "brand": "아식스",
+    "product_name": "",
+    "color": "",
+    "product_code": "1292A053",
+    "sizes_prices": [
+      {
+        "size": "225",
+        "price": 62000,
+        "delivery": "ABC마트배송"
+      },
+      {
+        "size": "230",
+        "price": 62000,
+        "delivery": "ABC마트배송"
+      },
+      {
+        "size": "235",
+        "price": 62000,
+        "delivery": "ABC마트배송"
+      }
+    ],
+    "scraped_at": "2025-06-20 06:34:55",
+    "worker_id": 5
+  },
+  {
+    "url": "https://abcmart.a-rt.com/product?prdtNo=1010112747",
+    "brand": "아식스",
+    "product_name": "",
+    "color": "",
+    "product_code": "1011B882",
+    "sizes_prices": [
+      {
+        "size": "250",
+        "price": 79000,
+        "delivery": "ABC마트배송"
+      },
+      {
+        "size": "255",
+        "price": 79000,
+        "delivery": "ABC마트배송"
+      },
+      {
+        "size": "260",
+        "price": 79000,
+        "delivery": "ABC마트배송"
+      },
+      {
+        "size": "265",
+        "price": 79000,
+        "delivery": "ABC마트배송"
+      },
+      {
+        "size": "270",
+        "price": 79000,
+        "delivery": "ABC마트배송"
+      },
+      {
+        "size": "275",
+        "price": 79000,
+        "delivery": "ABC마트배송"
+      },
+      {
+        "size": "280",
+        "price": 79000,
+        "delivery": "ABC마트배송"
+      },
+      {
+        "size": "285",
+        "price": 79000,
+        "delivery": "ABC마트배송"
+      }
+    ],
+    "scraped_at": "2025-06-20 06:34:55",
+    "worker_id": 1
+  },
+  {
+    "url": "https://abcmart.a-rt.com/product?prdtNo=1010104990",
+    "brand": "아식스",
+    "product_name": "",
+    "color": "",
+    "product_code": "1154A173",
+    "sizes_prices": [
+      {
+        "size": "220",
+        "price": 55000,
+        "delivery": "ABC마트배송"
+      }
+    ],
+    "scraped_at": "2025-06-20 06:35:01",
+    "worker_id": 2
+  },
+  {
+    "url": "https://abcmart.a-rt.com/product?prdtNo=1010106638",
+    "brand": "아식스",
+    "product_name": "",
+    "color": "",
+    "product_code": "1144A383",
+    "sizes_prices": [
+      {
+        "size": "품절",
+        "price": 69000,
+        "delivery": "ABC마트배송"
+      }
+    ],
+    "scraped_at": "2025-06-20 06:35:04",
+    "worker_id": 4
+  },
+  {
+    "url": "https://abcmart.a-rt.com/product?prdtNo=1010083604",
+    "brand": "아식스",
+    "product_name": "",
+    "color": "",
+    "product_code": "1201A325",
+    "sizes_prices": [
+      {
+        "size": "품절",
+        "price": 89000,
+        "delivery": "ABC마트배송"
+      }
+    ],
+    "scraped_at": "2025-06-20 06:35:06",
+    "worker_id": 3
+  },
+  {
+    "url": "https://abcmart.a-rt.com/product?prdtNo=1010102377",
+    "brand": "아식스",
+    "product_name": "",
+    "color": "",
+    "product_code": "FLC307",
+    "sizes_prices": [
+      {
+        "size": "품절",
+        "price": 79000,
+        "delivery": "ABC마트배송"
+      }
+    ],
+    "scraped_at": "2025-06-20 06:35:11",
+    "worker_id": 5
+  },
+  {
+    "url": "https://abcmart.a-rt.com/product?prdtNo=1010105069",
+    "brand": "아식스",
+    "product_name": "",
+    "color": "",
+    "product_code": "1292A066",
+    "sizes_prices": [
+      {
+        "size": "품절",
+        "price": 103000,
+        "delivery": "ABC마트배송"
+      }
+    ],
+    "scraped_at": "2025-06-20 06:35:13",
+    "worker_id": 2
+  },
+  {
+    "url": "https://abcmart.a-rt.com/product?prdtNo=1010102378",
+    "brand": "아식스",
+    "product_name": "",
+    "color": "",
+    "product_code": "TDW553",
+    "sizes_prices": [
+      {
+        "size": "품절",
+        "price": 103000,
+        "delivery": "ABC마트배송"
+      }
+    ],
+    "scraped_at": "2025-06-20 06:35:16",
+    "worker_id": 4
+  },
+  {
+    "url": "https://abcmart.a-rt.com/product?prdtNo=1010112748",
+    "brand": "아식스",
+    "product_name": "",
+    "color": "",
+    "product_code": "1012B678",
+    "sizes_prices": [
+      {
+        "size": "225",
+        "price": 79000,
+        "delivery": "ABC마트배송"
+      },
+      {
+        "size": "230",
+        "price": 79000,
+        "delivery": "ABC마트배송"
+      },
+      {
+        "size": "235",
+        "price": 79000,
+        "delivery": "ABC마트배송"
+      },
+      {
+        "size": "240",
+        "price": 79000,
+        "delivery": "ABC마트배송"
+      },
+      {
+        "size": "245",
+        "price": 79000,
+        "delivery": "ABC마트배송"
+      },
+      {
+        "size": "250",
+        "price": 79000,
+        "delivery": "ABC마트배송"
+      }
+    ],
+    "scraped_at": "2025-06-20 06:35:18",
+    "worker_id": 1
+  },
+  {
+    "url": "https://abcmart.a-rt.com/product?prdtNo=1010097577",
+    "brand": "아식스",
+    "product_name": "",
+    "color": "",
+    "product_code": "1202A164",
+    "sizes_prices": [
+      {
+        "size": "품절",
+        "price": 109000,
+        "delivery": "ABC마트배송"
+      }
+    ],
+    "scraped_at": "2025-06-20 06:35:22",
+    "worker_id": 3
+  },
+  {
+    "url": "https://abcmart.a-rt.com/product?prdtNo=1010102375",
+    "brand": "아식스",
+    "product_name": "",
+    "color": "",
+    "product_code": "FLC101",
+    "sizes_prices": [
+      {
+        "size": "품절",
+        "price": 79000,
+        "delivery": "ABC마트배송"
+      }
+    ],
+    "scraped_at": "2025-06-20 06:35:26",
+    "worker_id": 5
+  },
+  {
+    "url": "https://abcmart.a-rt.com/product?prdtNo=1010104991",
+    "brand": "아식스",
+    "product_name": "",
+    "color": "",
+    "product_code": "1154A173",
+    "sizes_prices": [
+      {
+        "size": "220",
+        "price": 55000,
+        "delivery": "ABC마트배송"
+      }
+    ],
+    "scraped_at": "2025-06-20 06:35:31",
+    "worker_id": 1
+  },
+  {
+    "url": "https://abcmart.a-rt.com/product?prdtNo=1010101152",
+    "brand": "아식스",
+    "product_name": "",
+    "color": "",
+    "product_code": "1203A298",
+    "sizes_prices": [
+      {
+        "size": "품절",
+        "price": 99000,
+        "delivery": "ABC마트배송"
+      }
+    ],
+    "scraped_at": "2025-06-20 06:35:33",
+    "worker_id": 2
+  },
+  {
+    "url": "https://abcmart.a-rt.com/product?prdtNo=1010102370",
+    "brand": "아식스",
+    "product_name": "",
+    "color": "",
+    "product_code": "1292A048",
+    "sizes_prices": [
+      {
+        "size": "품절",
+        "price": 69000,
+        "delivery": "ABC마트배송"
+      }
+    ],
+    "scraped_at": "2025-06-20 06:35:37",
+    "worker_id": 4
+  },
+  {
+    "url": "https://abcmart.a-rt.com/product?prdtNo=1010090548",
+    "brand": "아식스",
+    "product_name": "",
+    "color": "",
+    "product_code": "1201A715",
+    "sizes_prices": [
+      {
+        "size": "품절",
+        "price": 79000,
+        "delivery": "ABC마트배송"
+      }
+    ],
+    "scraped_at": "2025-06-20 06:35:40",
+    "worker_id": 5
+  },
+  {
+    "url": "https://abcmart.a-rt.com/product?prdtNo=1010102379",
+    "brand": "아식스",
+    "product_name": "",
+    "color": "",
+    "product_code": "TDW553",
+    "sizes_prices": [
+      {
+        "size": "품절",
+        "price": 103000,
+        "delivery": "ABC마트배송"
+      }
+    ],
+    "scraped_at": "2025-06-20 06:35:43",
+    "worker_id": 1
+  },
+  {
+    "url": "https://abcmart.a-rt.com/product?prdtNo=1010083606",
+    "brand": "아식스",
+    "product_name": "",
+    "color": "",
+    "product_code": "1201A325",
+    "sizes_prices": [
+      {
+        "size": "품절",
+        "price": 79000,
+        "delivery": "ABC마트배송"
+      }
+    ],
+    "scraped_at": "2025-06-20 06:35:43",
+    "worker_id": 3
+  },
+  {
+    "url": "https://abcmart.a-rt.com/product?prdtNo=1010097858",
+    "brand": "아식스",
+    "product_name": "",
+    "color": "",
+    "product_code": "1202A414",
+    "sizes_prices": [
+      {
+        "size": "270",
+        "price": 119000,
+        "delivery": "ABC마트배송"
+      },
+      {
+        "size": "275",
+        "price": 119000,
+        "delivery": "ABC마트배송"
+      }
+    ],
+    "scraped_at": "2025-06-20 06:35:50",
+    "worker_id": 2
+  },
+  {
+    "url": "https://abcmart.a-rt.com/product?prdtNo=1010104992",
+    "brand": "아식스",
+    "product_name": "",
+    "color": "",
+    "product_code": "1154A173",
+    "sizes_prices": [
+      {
+        "size": "품절",
+        "price": 55000,
+        "delivery": "ABC마트배송"
+      }
+    ],
+    "scraped_at": "2025-06-20 06:35:54",
+    "worker_id": 1
+  },
+  {
+    "url": "https://abcmart.a-rt.com/product?prdtNo=1010102372",
+    "brand": "아식스",
+    "product_name": "",
+    "color": "",
+    "product_code": "1292A053",
+    "sizes_prices": [
+      {
+        "size": "225",
+        "price": 62000,
+        "delivery": "ABC마트배송"
+      }
+    ],
+    "scraped_at": "2025-06-20 06:35:57",
+    "worker_id": 5
+  },
+  {
+    "url": "https://abcmart.a-rt.com/product?prdtNo=1010105070",
+    "brand": "아식스",
+    "product_name": "",
+    "color": "",
+    "product_code": "1292A066",
+    "sizes_prices": [
+      {
+        "size": "품절",
+        "price": 103000,
+        "delivery": "ABC마트배송"
+      }
+    ],
+    "scraped_at": "2025-06-20 06:35:57",
+    "worker_id": 4
+  },
+  {
+    "url": "https://abcmart.a-rt.com/product?prdtNo=1010102376",
+    "brand": "아식스",
+    "product_name": "",
+    "color": "",
+    "product_code": "FLC307",
+    "sizes_prices": [
+      {
+        "size": "품절",
+        "price": 79000,
+        "delivery": "ABC마트배송"
+      }
+    ],
+    "scraped_at": "2025-06-20 06:35:57",
+    "worker_id": 3
+  }
+]

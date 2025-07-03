@@ -1,0 +1,13 @@
+{
+  "strategies": {
+    "basic": {
+      "enabled": true,
+      "adjustments": {
+        "base": {
+          "enabled": true,
+          "rate": 0.05
+        }
+      }
+    }
+  }
+}
