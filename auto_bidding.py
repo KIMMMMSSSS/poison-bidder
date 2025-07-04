@@ -1068,6 +1068,13 @@ class AutoBidding:
                         except:
                             item['brand'] = "Unknown"
                         
+                        # 품번(code) 추출 - 필수 필드
+                        try:
+                            code_elem = self.driver.find_element(By.XPATH, "//dt[contains(text(), '품번')]/following-sibling::dd[1]")
+                            item['code'] = code_elem.text.strip()
+                        except:
+                            item['code'] = "Unknown"
+                        
                         # 상품명 추출
                         try:
                             name_elem = self.driver.find_element(By.CSS_SELECTOR, "span[data-mds='Typography'].text-title_18px_med")
