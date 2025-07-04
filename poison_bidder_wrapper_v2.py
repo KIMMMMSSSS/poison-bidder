@@ -354,13 +354,16 @@ def worker_process_wrapper(worker_id, task_queue, result_queue, status_dict, log
                 html_lang = bidder.driver.find_element(By.TAG_NAME, 'html').get_attribute('lang')
                 result_queue.put(("LOG", f"[Worker {worker_id}] 페이지 언어: {html_lang}"))
                 
-                if html_lang == 'zh':  # 중국어인 경우
-                    result_queue.put(("LOG", f"[Worker {worker_id}] 중국어 페이지 감지. 영어로 변경 시도..."))
+                if html_lang != 'en':  # 영어가 아닌 경우 (중국어 포함)
+                    result_queue.put(("LOG", f"[Worker {worker_id}] 비영어 페이지 감지 ({html_lang}). 영어로 변경 시도..."))
                     if change_language_to_english(bidder.driver, result_queue, worker_id):
                         result_queue.put(("LOG", f"[Worker {worker_id}] 언어 변경 성공!"))
                     else:
-                        result_queue.put(("LOG", f"[Worker {worker_id}] 언어 변경 실패. 중국어로 진행..."))
-                        # URL 파라미터로 언어 강제 설정 시도
+                        result_queue.put(("LOG", f"[Worker {worker_id}] 언어 변경 실패. 현재 언어로 진행..."))
+                        # 페이지 새로고침 시도
+                        result_queue.put(("LOG", f"[Worker {worker_id}] 페이지 새로고침 시도..."))
+                        bidder.driver.refresh()
+                        time.sleep(3)
                         current_url = bidder.driver.current_url
                         if "?" in current_url:
                             bidder.driver.get(current_url + "&lang=en")
@@ -548,14 +551,28 @@ def worker_process_wrapper(worker_id, task_queue, result_queue, status_dict, log
                         time.sleep(3)
                         
                         # 로그인 확인
-                        try:
-                            search_box = bidder.driver.find_element(By.XPATH, "//input[@id='Item Info']")
-                            result_queue.put(("LOG", f"[Worker {worker_id}] 로그인 상태 확인 완료!"))
-                            time.sleep(worker_id * 0.3)  # 워커별 시작 시간 분산
-                            break
-                        except:
-                            result_queue.put(("ERROR", f"[Worker {worker_id}] 쿠키 로드 후 로그인 확인 실패"))
-                            raise Exception("쿠키 로드 실패")
+                        max_retry = 3
+                        for retry in range(max_retry):
+                            try:
+                                search_box = bidder.driver.find_element(By.XPATH, "//input[@id='Item Info']")
+                                result_queue.put(("LOG", f"[Worker {worker_id}] 로그인 상태 확인 완료!"))
+                                time.sleep(worker_id * 0.3)  # 워커별 시작 시간 분산
+                                break
+                            except:
+                                if retry < max_retry - 1:
+                                    result_queue.put(("LOG", f"[Worker {worker_id}] 로그인 확인 실패, 페이지 새로고침 후 재시도... ({retry+1}/{max_retry})"))
+                                    bidder.driver.refresh()
+                                    time.sleep(3)
+                                    # Worker 1의 로그인 재시도
+                                    if worker_id == 1:
+                                        # 로그인 페이지로 이동하여 재로그인 시도
+                                        bidder.driver.get("https://seller.poizon.com/main/dataBoard")
+                                        time.sleep(5)
+                                        # 로그인 상태 다시 체크하도록 continue
+                                        continue
+                                else:
+                                    result_queue.put(("ERROR", f"[Worker {worker_id}] 쿠키 로드 후 로그인 확인 최종 실패"))
+                                    raise Exception("쿠키 로드 실패")
                     else:
                         result_queue.put(("ERROR", f"[Worker {worker_id}] 쿠키 파일 로드 실패"))
                         raise Exception("쿠키 파일 없음")

@@ -121,13 +121,19 @@ def escape_markdown(text: str) -> str:
         이스케이프된 텍스트
     """
     # 텔레그램 마크다운에서 이스케이프가 필요한 문자들
-    special_chars = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!']
+    # 백슬래시를 두 번 사용해야 함
+    special_chars = ['\\', '_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!']
     
     if not text:
         return text
         
     text = str(text)
-    for char in special_chars:
+    
+    # 백슬래시를 먼저 처리 (이미 있는 백슬래시를 보호)
+    text = text.replace('\\', '\\\\')
+    
+    # 나머지 특수문자 처리
+    for char in special_chars[1:]:
         text = text.replace(char, f'\\{char}')
     
     return text

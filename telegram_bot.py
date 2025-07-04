@@ -1055,7 +1055,16 @@ class BiddingBot:
                         # 큐가 비어있으면 짧게 대기
                         await asyncio.sleep(0.1)
                     except Exception as e:
-                        logger.error(f"큐 모니터링 중 오류: {e}")
+                        logger.error(f"큐 모니터링 중 오류: {type(e).__name__}: {str(e)}")
+                        # 마크다운 파싱 오류인 경우 일반 텍스트로 재시도
+                        if "parse entities" in str(e).lower():
+                            try:
+                                # 마크다운 없이 재전송
+                                await query.message.chat.send_message(
+                                    f"{status['stage']} - {status['progress']}% - {status['message']}"
+                                )
+                            except Exception as retry_error:
+                                logger.error(f"메시지 재전송 실패: {retry_error}")
             
             # 큐 모니터링 시작
             monitor_task = asyncio.create_task(monitor_queue())
